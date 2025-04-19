@@ -6,18 +6,22 @@ import random
 import joblib
 import numpy as np
 import pandas as pd
-from chatbot_helpers import build_zone_price_response
-from chatbot_helpers import get_spec_from_budget
+from chatbot_helpers import build_zone_price_response, get_spec_from_budget
+from difflib import get_close_matches
 
 # === Load NLP intent classification model ===
 with open("data/intents.json", "r", encoding="utf-8") as f:
     intents_data = json.load(f)
-
 with open("models/nlp_model.pkl", "rb") as f:
     nlp_model, vectorizer, label_encoder = joblib.load(f)
-
 with open("models/feature_columns.json", "r") as f:
     feature_columns = json.load(f)
+
+KOTA_LIST = [
+    "jakarta pusat", "jakarta selatan", "jakarta timur", 
+    "jakarta barat", "jakarta utara", "jakarta", 
+    "bogor", "depok", "tangerang", "bekasi"
+]
 
 # === Session context ===
 session_context = {
@@ -29,20 +33,20 @@ session_context = {
     "floors": None,
     "carports": None,
     "building_area": None,
+    "pending_budget_query": None,
     "awaiting_luas_tanah": False,
     "awaiting_jumlah_kamar": False,
     "awaiting_jumlah_kamar_mandi": False,
     "awaiting_building_area": False  # ⬅️ Tambahan penting
 }
-
 # === Ekstraksi fitur dari teks ===
 def extract_info(text):
     text = text.lower()
     result = {}
 
-    if m := re.search(r'((jakarta|bogor|depok|tangerang|bekasi)( [a-z]+)?)', text):
+    if m := re.search(r'\b(jakarta( [a-z]+)?|bogor|depok|tangerang|bekasi)\b', text):
         result["kota"] = m.group(1).strip()
-    if m := re.search(r'(\d+)\s*(m\u00b2|m2|meter)', text):
+    if m := re.search(r'(\d+)\s*(m2|m²|meter)?\s*(luas\s*tanah)', text):
         result["luas_tanah"] = int(m.group(1))
     if m := re.search(r'(\d+)\s*kamar mandi', text):
         result["bathrooms"] = int(m.group(1))
@@ -54,8 +58,16 @@ def extract_info(text):
         result["garasi"] = int(m.group(1))
     if m := re.search(r'(\d+)\s*carport', text):
         result["carports"] = int(m.group(1))
-    if m := re.search(r'(\d+)\s*(m2|m\u00b2|meter)?\s*(bangunan)?', text):
+    if m := re.search(r'(\d+)\s*(m2|m²|meter)?\s*(luas )?(bangunan)', text):
         result["building_area"] = int(m.group(1))
+    
+    if "kota" not in result:
+        tokens = text.lower().split()
+        for token in tokens:
+            closest = get_close_matches(token, KOTA_LIST, n=1, cutoff=0.75)
+            if closest:
+                result["kota"] = closest[0]
+                break
 
     return result
 
@@ -107,8 +119,25 @@ def get_response_by_tag(tag):
 # === Fungsi utama ===
 def chatbot_response(user_input):
     global session_context
+    
+    if not user_input.strip():
+        return "Silakan masukkan pertanyaan atau informasi yang Anda butuhkan. Saya bisa membantu memprediksi harga rumah dan spesifikasi berdasarkan budget Anda di wilayah Jabodetabek."
 
-    # Tangani kelanjutan input "lanjutkan" → jangan deteksi intent, cukup teruskan alur pertanyaan
+    # 1. Tangani jawaban terhadap pending budget (user menyebutkan kota saja)
+    if session_context.get("pending_budget_query"):
+        info = extract_info(user_input)
+        if "kota" in info:
+            kota = info["kota"]
+            session_context["kota"] = kota
+            if kota.lower() == "jakarta":
+                return "Jakarta mana yang Anda maksud? Jakarta Utara, Selatan, Timur, Barat, atau Pusat?"
+            budget_rp = session_context.pop("pending_budget_query")  # hapus setelah digunakan
+            result = get_spec_from_budget(budget_rp, kota)
+            session_context["kota"] = None
+            
+            return result
+
+    # 2. Tangani lanjutan input "lanjutkan"
     if user_input.lower() == "lanjutkan":
         if not session_context.get("jumlah_kamar"):
             session_context["awaiting_jumlah_kamar"] = True
@@ -118,58 +147,44 @@ def chatbot_response(user_input):
             return "Berapa jumlah kamar mandi yang Anda butuhkan (misal : 2 kamar mandi)?"
         if not session_context.get("luas_tanah"):
             session_context["awaiting_luas_tanah"] = True
-            return "Berapa luas tanah yang Anda inginkan (misal : 180 meter)?"
+            return "Berapa luas tanah yang Anda inginkan (misal : 180 meter luas tanah)?"
         if not session_context.get("building_area"):
             session_context["awaiting_building_area"] = True
-            return "Berapa kira-kira luas bangunan yang Anda inginkan? (misal: 80 m2)"
+            return "Berapa kira-kira luas bangunan yang Anda inginkan? (misal: 80 m2 luas bangunan)"
 
-        # Semua data lengkap → prediksi
         kota = session_context.get("kota")
         input_row = build_input_row(session_context)
-        session_context = {k: None for k in session_context}
-        return build_zone_price_response(input_row, kota)
+        response = build_zone_price_response(input_row, kota)
+        session_context = {k: None for k in session_context}  # ← Reset di akhir
+        return response
 
-    # Ekstrak info user dan update context
+
+    # 3. Ekstrak info user & update session
     info = extract_info(user_input)
     session_context.update({k: v for k, v in info.items() if v is not None})
 
-    # Tangani input yang ditunggu sebelumnya
-    if session_context["awaiting_jumlah_kamar"]:
-        if "jumlah_kamar" in info:
-            session_context["jumlah_kamar"] = info["jumlah_kamar"]
-            session_context["awaiting_jumlah_kamar"] = False
-            return chatbot_response("lanjutkan")
-        else:
-            return "Berapa jumlah kamar tidur yang Anda butuhkan (misal : 2 kamar)?"
+    # 4. Tangani input yang ditunggu sebelumnya
+    if session_context["awaiting_jumlah_kamar"] and "jumlah_kamar" in info:
+        session_context["awaiting_jumlah_kamar"] = False
+        return chatbot_response("lanjutkan")
 
-    if session_context["awaiting_jumlah_kamar_mandi"]:
-        if "bathrooms" in info:
-            session_context["bathrooms"] = info["bathrooms"]
-            session_context["awaiting_jumlah_kamar_mandi"] = False
-            return chatbot_response("lanjutkan")
-        else:
-            return "Berapa jumlah kamar mandi yang Anda butuhkan? (misal : 2 kamar mandi)"
+    if session_context["awaiting_jumlah_kamar_mandi"] and "bathrooms" in info:
+        session_context["awaiting_jumlah_kamar_mandi"] = False
+        return chatbot_response("lanjutkan")
 
-    if session_context["awaiting_building_area"]:
-        if "building_area" in info:
-            session_context["building_area"] = info["building_area"]
-            session_context["awaiting_building_area"] = False
-            return chatbot_response("lanjutkan")
-        else:
-            return "Berapa kira-kira luas bangunan yang Anda inginkan? (misal: 80 m2)"
+    if session_context["awaiting_building_area"] and "building_area" in info:
+        session_context["awaiting_building_area"] = False
+        return chatbot_response("lanjutkan")
 
-    if session_context["awaiting_luas_tanah"]:
-        if "luas_tanah" in info:
-            session_context["luas_tanah"] = info["luas_tanah"]
-            session_context["awaiting_luas_tanah"] = False
-            return chatbot_response("lanjutkan")
-        else:
-            return "Berapa luas tanah yang Anda inginkan? (misal : 180 meter)"
+    if session_context["awaiting_luas_tanah"] and "luas_tanah" in info:
+        session_context["awaiting_luas_tanah"] = False
+        return chatbot_response("lanjutkan")
 
-    # === Deteksi intent hanya jika bukan input "lanjutkan"
+    # 5. Deteksi intent
     x_vec = vectorizer.transform([user_input]).toarray()
     intent = label_encoder.inverse_transform(nlp_model.predict(x_vec))[0]
 
+    # 6. Tangani intent tanya_dari_budget
     if intent == "tanya_dari_budget":
         match = re.search(r'(\d+[.,]?\d*)\s*(juta|miliar|m|jt)', user_input.lower())
         if match:
@@ -178,26 +193,35 @@ def chatbot_response(user_input):
                 angka = float(raw_angka)
             except ValueError:
                 return "Nominal budget tidak dapat dipahami, coba ketik ulang misalnya: 1.2 miliar"
-            
             satuan = match.group(2)
-
-            if satuan in ['m', 'miliar']:
-                budget_rp = int(angka * 1_000_000_000)
-            elif satuan in ['jt', 'juta']:
-                budget_rp = int(angka * 1_000_000)
+            budget_rp = int(angka * 1_000_000_000 if satuan in ['m', 'miliar'] else angka * 1_000_000)
+            
+            # Simpan budget ke dalam session
+            session_context["pending_budget_query"] = budget_rp
+            
+            kota = session_context.get("kota") or extract_info(user_input).get("kota")
+            
+            if kota:
+                session_context["kota"] = kota  # simpan kota ke context
+                
+                if kota.lower() == "jakarta":
+                    return "Jakarta mana yang Anda maksud? Jakarta Utara, Selatan, Timur, Barat, atau Pusat?"
+                
+                # Jika bukan "jakarta", lanjutkan prediksi
+                session_context.pop("pending_budget_query", None)
+                result = get_spec_from_budget(budget_rp, kota)
+                session_context["kota"] = None
+                
+                return result
             else:
-                budget_rp = int(angka)
-
-
-            kota = session_context.get("kota")
-            if not kota:
                 return "Di kota mana Anda ingin mencari rumah dengan budget tersebut?"
-            return get_spec_from_budget(budget_rp, kota)
+            
         else:
             return "Berapa budget yang Anda miliki untuk membeli rumah?"
 
+    # 7. Tangani intent cari_rumah dan tanya_harga
     if intent in ["tanya_harga", "cari_rumah"]:
-        if session_context.get("kota") == "jakarta":
+        if session_context.get("kota") and session_context["kota"].lower() == "jakarta":
             return "Jakarta mana yang Anda maksud? jakarta Utara, jakarta Selatan, jakarta Timur, jakarta Barat, atau jakarta Pusat?"
         if not session_context.get("kota"):
             return "Di kota mana Anda ingin mencari rumah?"
@@ -209,25 +233,25 @@ def chatbot_response(user_input):
             return "Berapa jumlah kamar mandi yang Anda butuhkan (misal : 2 kamar mandi)? "
         if not session_context.get("luas_tanah"):
             session_context["awaiting_luas_tanah"] = True
-            return "Berapa luas tanah yang Anda inginkan (misal : 180 meter)?"
+            return "Berapa luas tanah yang Anda inginkan (misal : 180 meter luas tanah)?"
         if not session_context.get("building_area"):
             session_context["awaiting_building_area"] = True
-            return "Berapa kira-kira luas bangunan yang Anda inginkan? (misal: 80 m2)"
+            return "Berapa kira-kira luas bangunan yang Anda inginkan? (misal: 80 m2 luas bangunan)"
 
         kota = session_context.get("kota")
         input_row = build_input_row(session_context)
-        session_context = {k: None for k in session_context}
-        return build_zone_price_response(input_row, kota)
+        response = build_zone_price_response(input_row, kota)
+        session_context = {k: None for k in session_context}  # ← Reset di akhir
+        return response
 
+
+    # 8. Fallback untuk unknown intent
     if intent == "unknown":
-        # Deteksi fallback untuk pertanyaan tentang budget
         if re.search(r'(budget|dana|uang|punya|modal)\s+[\d,.]+\s*(miliar|jt|juta|m)?', user_input.lower()):
-            intent = "tanya_dari_budget"
-        else:
-            return get_response_by_tag("unknown")
+            return chatbot_response(user_input)
+        return get_response_by_tag("unknown")
 
     return get_response_by_tag(intent)
-
 
 # === CLI ===
 if __name__ == "__main__":
