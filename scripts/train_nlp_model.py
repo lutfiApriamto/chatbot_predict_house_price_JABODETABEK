@@ -1,5 +1,7 @@
+# scripts/train_nlp_model.py
+
 import json
-import pickle
+import joblib
 import os
 import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
@@ -18,7 +20,7 @@ y = []
 
 for intent in intents["intents"]:
     for pattern in intent["patterns"]:
-        X.append(pattern)
+        X.append(pattern.lower())  # Menormalkan teks
         y.append(intent["tag"])
 
 # === Ekstraksi fitur dengan CountVectorizer ===
@@ -46,7 +48,6 @@ print(classification_report(y_test, y_pred, target_names=label_encoder.classes_)
 
 # === Simpan model, vectorizer, dan label encoder ===
 os.makedirs("models", exist_ok=True)
-with open("models/nlp_model.pkl", "wb") as f:
-    pickle.dump((model, vectorizer, label_encoder), f)
+joblib.dump((model, vectorizer, label_encoder), "models/nlp_model.pkl")
 
 print("\n✅ Model NLP berhasil disimpan ke models/nlp_model.pkl")

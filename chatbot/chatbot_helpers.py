@@ -38,7 +38,7 @@ def estimate_price_in_zone(input_row, zone_label, sample_n=2):
     prices = []
     for _, row in samples.iterrows():
         modified_input = input_row.copy()
-        modified_input["log_price"] = row["log_price"]
+        modified_input["log_price"] = np.log1p(row["price_in_rp"])
         y_pred_log = price_model.predict(modified_input[feature_columns])[0]
         y_pred = round(np.expm1(y_pred_log))
         prices.append((row["price_in_rp"], y_pred))
@@ -46,27 +46,32 @@ def estimate_price_in_zone(input_row, zone_label, sample_n=2):
 
 
 def get_district_examples(zone_label, kota=None, n=2):
-    df = raw_df.copy()
+    df = zone_df.copy()  # gunakan hasil preprocessing final
     df["city"] = df["city"].astype(str).str.strip().str.lower()
-    df["price_category"] = df["price_in_rp"].apply(lambda x:
-        "murah" if x < zone_df["price_in_rp"].quantile(0.33) else
-        "sedang" if x < zone_df["price_in_rp"].quantile(0.66) else "mahal"
-    )
-    filtered = df[df["price_category"] == zone_label]
+    df["district"] = df["district"].astype(str).str.strip().str.lower()
+    
+    # Filter berdasarkan zona
+    df = df[df["price_category"] == zone_label]
+    
+    # Filter berdasarkan kota jika ada
     if kota:
         kota = kota.strip().lower()
-        filtered = filtered[filtered["city"].str.contains(kota)]
+        df = df[df["city"].str.contains(kota, case=False, na=False)]
 
-    districts = filtered["district"].dropna().unique().tolist()
+    # Ambil daftar distrik unik
+    districts = df["district"].dropna().unique().tolist()
     if not districts:
         return ["Belum tersedia"] * n
     return random.sample(districts, min(n, len(districts)))
 
-
 def build_zone_price_response(input_row, kota=None):
     zone = predict_zone_from_features(input_row)
-    locations = get_district_examples(zone, kota)
-    prices = estimate_price_in_zone(input_row, zone)
+    sample_n = 2
+    locations = get_district_examples(zone, kota, n=sample_n)
+    prices = estimate_price_in_zone(input_row, zone, sample_n=sample_n)
+    # Pastikan jumlah locations cukup
+    while len(locations) < len(prices):
+        locations.append("Belum tersedia")
     response = (
     f"Rumah dengan spesifikasi yang Anda sebutkan yaitu:\n"
     f"- {int(input_row['bedrooms'][0])} kamar tidur\n"
@@ -85,14 +90,12 @@ def build_zone_price_response(input_row, kota=None):
         )
     return response.strip()
 
-
-
 def get_spec_from_budget(budget_rp, kota=None, verbose=False):
     df = raw_df.copy()
     if kota:
         kota = kota.strip().lower()
         df["city"] = df["city"].astype(str).str.strip().str.lower()
-        df = df[df["city"].str.contains(kota)]
+        df = df[df["city"].str.contains(kota, case=False, na=False)]
 
     if verbose:
         print("\n[DEBUG] === get_spec_from_budget ===")
@@ -108,7 +111,7 @@ def get_spec_from_budget(budget_rp, kota=None, verbose=False):
         closest_df = raw_df.copy()
         if kota:
             closest_df["city"] = closest_df["city"].astype(str).str.strip().str.lower()
-            closest_df = closest_df[closest_df["city"].str.contains(kota)]
+            closest_df = closest_df[closest_df["city"].str.contains(kota, case=False, na=False)]
 
         if closest_df.empty:
             return f"Maaf, kami belum menemukan rumah di {kota.title()}."

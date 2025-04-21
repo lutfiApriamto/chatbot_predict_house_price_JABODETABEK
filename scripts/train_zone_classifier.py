@@ -9,13 +9,13 @@ from sklearn.metrics import classification_report, confusion_matrix
 
 # === Load data ===
 print("📦 Membaca data...")
-df = pd.read_csv("data/processed/preprocessed_v2.csv")
+df = pd.read_csv("data/processed/preprocessed_final.csv")
 
 # Hapus baris tanpa label kategori harga
 df = df.dropna(subset=["price_category"])
 
 # Pisahkan fitur dan target
-X = df.drop(columns=["log_price", "price_category"])
+X = df.drop(columns=["log_price", "price_category", "price_in_rp"]) 
 y = df["price_category"]
 
 # Simpan nama kolom fitur

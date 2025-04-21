@@ -87,7 +87,8 @@ def build_input_row(info):
 
     # Tambah city_ jika tersedia
     if session_context.get("kota"):
-        city_col = f"city_{session_context['kota'].lower()}"
+        city_key = session_context['kota'].lower().replace(" ", "_")
+        city_col = f"city_{city_key}"
         row[city_col] = 1
 
     # Fitur tambahan
@@ -222,7 +223,7 @@ def chatbot_response(user_input):
     # 7. Tangani intent cari_rumah dan tanya_harga
     if intent in ["tanya_harga", "cari_rumah"]:
         if session_context.get("kota") and session_context["kota"].lower() == "jakarta":
-            return "Jakarta mana yang Anda maksud? jakarta Utara, jakarta Selatan, jakarta Timur, jakarta Barat, atau jakarta Pusat?"
+            return "Jakarta mana yang Anda maksud? Jakarta Utara, Jakarta Selatan, Jakarta Timur, Jakarta Barat, atau Jakarta Pusat?"
         if not session_context.get("kota"):
             return "Di kota mana Anda ingin mencari rumah?"
         if not session_context.get("jumlah_kamar"):

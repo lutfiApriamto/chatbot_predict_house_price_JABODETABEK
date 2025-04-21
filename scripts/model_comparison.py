@@ -8,7 +8,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 # ==== 1. Load Data ====
-df = pd.read_csv("data/processed/preprocessed_v3.csv")
+df = pd.read_csv("data/processed/preprocessed_final.csv")
 with open("models/feature_columns.json", "r") as f:
     features = json.load(f)
 

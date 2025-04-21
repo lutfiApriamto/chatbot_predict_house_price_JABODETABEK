@@ -31,7 +31,6 @@ row = {
     "luas_per_kamar": input_spec["building_area"] / (input_spec["bedrooms"] + 1),
     "kamar_mandi_per_kamar": input_spec["bathrooms"] / (input_spec["bedrooms"] + 1),
 }
-
 row.update(input_spec)
 
 input_df = pd.DataFrame([row])
@@ -43,10 +42,13 @@ print(f"\n📍 Zona harga yang diprediksi: {predicted_zone.upper()}")
 
 # === 5. Cari lokasi contoh dari data asli ===
 df_zone = pd.read_csv("data/processed/zone_label.csv")
-df_all = pd.read_csv("data/raw/jabodetabek_house_price.csv")
 
-# Gabung berdasarkan index
-df_zone_full = pd.concat([df_zone, df_all[["district", "bedrooms", "bathrooms", "land_area"]]], axis=1)
+# Pastikan kolom district dan lainnya bersih
+df_zone["district"] = df_zone["district"].astype(str).str.strip().str.lower()
+df_zone.dropna(subset=["land_area", "bedrooms", "bathrooms"], inplace=True)
+
+# Langsung gunakan df_zone tanpa merge
+df_zone_full = df_zone.copy()
 
 # Filter zona yang sama & spesifikasi mirip
 mask = (
@@ -60,6 +62,6 @@ matching_rows = df_zone_full[mask]
 sample_districts = matching_rows["district"].value_counts().head(3).index.tolist()
 
 if sample_districts:
-    print(f"📌 Contoh lokasi di zona ini: {', '.join(sample_districts)}")
+    print(f"📌 Contoh lokasi di zona ini: {', '.join([d.title() for d in sample_districts])}")
 else:
     print("⚠️ Tidak ditemukan contoh lokasi yang cocok dalam zona ini.")
