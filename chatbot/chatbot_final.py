@@ -6,7 +6,13 @@ import random
 import joblib
 import numpy as np
 import pandas as pd
-from chatbot_helpers import build_zone_price_response, get_spec_from_budget
+from chatbot_helpers import (
+    build_zone_price_response,
+    get_spec_from_budget,
+    check_unreasonable_input,
+    is_unreasonable_budget,
+    normalize_input_keys
+)
 from difflib import get_close_matches
 
 # === Load NLP intent classification model ===
@@ -154,6 +160,12 @@ def chatbot_response(user_input):
             return "Berapa kira-kira luas bangunan yang Anda inginkan? (misal: 80 m2 luas bangunan)"
 
         kota = session_context.get("kota")
+        
+        # Validasi input tidak wajar
+        warning = check_unreasonable_input(normalize_input_keys(session_context))
+        if warning:
+            return warning
+        
         input_row = build_input_row(session_context)
         response = build_zone_price_response(input_row, kota)
         session_context = {k: None for k in session_context}  # ← Reset di akhir
@@ -197,6 +209,11 @@ def chatbot_response(user_input):
             satuan = match.group(2)
             budget_rp = int(angka * 1_000_000_000 if satuan in ['m', 'miliar'] else angka * 1_000_000)
             
+            # Validasi budget tidak wajar
+            warning = is_unreasonable_budget(budget_rp)
+            if warning:
+                return warning
+
             # Simpan budget ke dalam session
             session_context["pending_budget_query"] = budget_rp
             
@@ -240,6 +257,11 @@ def chatbot_response(user_input):
             return "Berapa kira-kira luas bangunan yang Anda inginkan? (misal: 80 m2 luas bangunan)"
 
         kota = session_context.get("kota")
+        # Validasi input tidak wajar
+        warning = check_unreasonable_input(normalize_input_keys(session_context))
+        if warning:
+            return warning
+        
         input_row = build_input_row(session_context)
         response = build_zone_price_response(input_row, kota)
         session_context = {k: None for k in session_context}  # ← Reset di akhir

@@ -1,7 +1,0 @@
-import pandas as pd
-
-# Baca data
-raw_df = pd.read_csv("data/raw/jabodetabek_house_price.csv")
-
-# Tampilkan semua nilai unik pada kolom city
-print(raw_df["city"].unique())

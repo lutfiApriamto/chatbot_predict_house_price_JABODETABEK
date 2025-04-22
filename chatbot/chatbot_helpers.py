@@ -19,6 +19,85 @@ with open("models/feature_columns_zone.json", "r") as f:
 zone_df = pd.read_csv("data/processed/zone_label.csv")
 raw_df = pd.read_csv("data/raw/jabodetabek_house_price.csv")
 
+# Hitung batas bawah dan atas dari fitur numerik
+PERCENTILE_MIN = 0.01
+PERCENTILE_MAX = 0.99
+
+feature_bounds = raw_df[[
+    "bedrooms", "bathrooms", "land_area", "building_area",
+    "carports", "garages", "floors"
+]].quantile([PERCENTILE_MIN, PERCENTILE_MAX]).to_dict()
+
+def normalize_input_keys(ctx):
+    return {
+        "bedrooms": ctx.get("jumlah_kamar"),
+        "bathrooms": ctx.get("bathrooms"),
+        "land_area": ctx.get("luas_tanah"),
+        "building_area": ctx.get("building_area"),
+        "carports": ctx.get("carports"),
+        "garages": ctx.get("garasi"),
+        "floors": ctx.get("floors")
+    }
+
+def check_unreasonable_input(info):
+    warnings = []
+    bounds_info = get_feature_bounds()
+
+    def is_out_of_bounds(key, value):
+        if key not in bounds_info or value is None:
+            return False
+        low, high = bounds_info[key]
+        return value < low or value > high
+
+    unreasonable_keys = []
+    for key, label in [
+        ("bedrooms", "jumlah kamar tidur"),
+        ("bathrooms", "jumlah kamar mandi"),
+        ("land_area", "luas tanah"),
+        ("building_area", "luas bangunan"),
+        ("floors", "jumlah lantai"),
+        ("carports", "jumlah carport"),
+        ("garages", "jumlah garasi"),
+    ]:
+        value = info.get(key)
+        if value is not None and is_out_of_bounds(key, value):
+            low, high = bounds_info[key]
+            warnings.append(f"- {label} yang Anda masukkan ({value}) terlihat tidak umum.")
+            unreasonable_keys.append((label, low, high))
+
+    if not warnings:
+        return None  # Input wajar
+
+    # Format pesan peringatan lengkap
+    warning_text = "⚠️ Perhatian:\n"
+    warning_text += "Sistem mendeteksi bahwa beberapa input yang Anda masukkan tampaknya tidak wajar:\n"
+    warning_text += "\n".join(warnings)
+    warning_text += "\n\nBerdasarkan data yang kami miliki, umumnya:\n"
+    for label, low, high in unreasonable_keys:
+        warning_text += f"- {label} berada antara {low} hingga {high}\n"
+    warning_text += "\nSilakan masukkan kembali data spesifikasi rumah dengan nilai yang lebih wajar."
+
+    return warning_text.strip()
+
+def is_unreasonable_budget(budget_rp):
+    min_price = raw_df["price_in_rp"].quantile(0.01)
+    max_price = raw_df["price_in_rp"].quantile(0.99)
+
+    if budget_rp < min_price or budget_rp > max_price:
+        return (
+            f"⚠️ Perhatian:\n"
+            f"Budget yang Anda masukkan ({budget_rp:,.0f}) terlihat tidak umum.\n\n"
+            f"Berdasarkan data yang kami miliki, harga rumah biasanya berada antara "
+            f"Rp {min_price:,.0f} hingga Rp {max_price:,.0f}.\n"
+            f"Silakan masukkan budget yang lebih realistis agar kami dapat membantu Anda dengan akurat."
+        )
+    return None
+
+def get_feature_bounds():
+    return {
+        key: (round(value[0.01], 2), round(value[0.99], 2))
+        for key, value in feature_bounds.items()
+    }
 
 def predict_zone_from_features(input_row):
     input_zone = input_row.copy()
@@ -69,18 +148,35 @@ def build_zone_price_response(input_row, kota=None):
     sample_n = 2
     locations = get_district_examples(zone, kota, n=sample_n)
     prices = estimate_price_in_zone(input_row, zone, sample_n=sample_n)
-    # Pastikan jumlah locations cukup
+
+    # Pastikan jumlah lokasi cukup
     while len(locations) < len(prices):
         locations.append("Belum tersedia")
+
+    # Mulai menyusun respons
     response = (
-    f"Rumah dengan spesifikasi yang Anda sebutkan yaitu:\n"
-    f"- {int(input_row['bedrooms'][0])} kamar tidur\n"
-    f"- {int(input_row['bathrooms'][0])} kamar mandi\n"
-    f"- Luas tanah {int(input_row['land_area'][0])} m²\n"
-    f"- Luas bangunan {int(input_row['building_area'][0])} m²\n"
-    f"berlokasi di kota {kota.title()}.\n\n"
-    f"Kota ini termasuk ke dalam zona {zone.upper()}.\n"
-)
+        f"Rumah dengan spesifikasi yang Anda sebutkan yaitu:\n"
+        f"- {int(input_row['bedrooms'][0])} kamar tidur\n"
+        f"- {int(input_row['bathrooms'][0])} kamar mandi\n"
+        f"- Luas tanah {int(input_row['land_area'][0])} m²\n"
+        f"- Luas bangunan {int(input_row['building_area'][0])} m²\n"
+    )
+
+    # Tambahkan fitur opsional jika tersedia dan > 0
+    optional_features = {
+        "garages": "garasi",
+        "carports": "carport",
+        "floors": "lantai"
+    }
+
+    for key, label in optional_features.items():
+        if key in input_row.columns:
+            val = input_row[key][0]
+            if pd.notna(val) and val > 0:
+                response += f"- {int(val)} {label}\n"
+
+    response += f"berlokasi di kota {kota.title()}.\n\n"
+    response += f"Kota ini termasuk ke dalam zona {zone.upper()}.\n"
 
     for i, (real_price, est_price) in enumerate(prices):
         district = locations[i] if i < len(locations) and locations[i] else "Belum tersedia"
@@ -88,6 +184,7 @@ def build_zone_price_response(input_row, kota=None):
             f"\n📍 Contoh lokasi: {district.title()}\n"
             f"💰 Estimasi harga: Rp {est_price:,.0f}"
         )
+
     return response.strip()
 
 def get_spec_from_budget(budget_rp, kota=None, verbose=False):
