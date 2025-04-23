@@ -1,0 +1,183 @@
+# ==== 2. Normalisasi kolom kategori ====
+for col in ["city", "district", "property_type"]:
+    df[col] = df[col].astype(str).str.strip().str.lower()
+
+
+code diatas berfungsi untuk menormalisasi nilai pada kolom kategori dalam dataset, yaitu kolom: "city", "district", dan "property_type".
+    - astype(str) = mengubah semuanya pada colom menjadi string
+    - .str.strip() = menghilangkan strip di awal dan diakhir data
+    - .str.lower() = mengubah semua format menjadi huruf kecil
+
+# ==== 3. Deteksi wilayah Jakarta dari address/district ====
+def classify_jakarta_region(row):
+    combined = f"{row.get('address', '')} {row['district']}".lower()
+    for wilayah in ["selatan", "utara", "timur", "barat", "pusat"]:
+        if f"jakarta {wilayah}" in combined:
+            return f"jakarta {wilayah}"
+    return row["city"]
+
+df["city"] = df.apply(classify_jakarta_region, axis=1)
+
+Bagian ini bertujuan untuk mengklasifikasikan wilayah Jakarta secara lebih spesifik (Jakarta Selatan, Barat, Timur, Utara, atau Pusat), meskipun data awalnya mungkin hanya mencantumkan "jakarta" sebagai city.
+    - combined = f"{row.get('address', '')} {row['district']}".lower() = menggabungkan kolom addres dan district menjadi satu sting kecil.
+    - for wilayah in ["selatan", "utara", "timur", "barat", "pusat"]:
+        if f"jakarta {wilayah}" in combined:
+            return f"jakarta {wilayah}"
+    return row["city"] = perulangan yang digunakan untuk mengecek apakah ada jakarta (wilayah (timur, barat, selatan, utara, pusat)) pada colom district dan city 
+
+    - df["city"] = df.apply(classify_jakarta_region, axis=1) menerapkan function ke semua colom pada data frame.
+    - tambahan :
+        - axis=0 : 	Kalau kamu ingin operasi antar baris di satu kolom
+        - axis=1 : Kalau kamu ingin operasi yang tergantung pada banyak kolom di satu baris
+
+# ==== 4. Hapus data tanpa harga ====
+df = df.dropna(subset=["price_in_rp"])
+
+code diatas berfungsi untuk "Buang semua baris data yang kolom price_in_rp-nya kosong (NaN)."
+Karena price_in_rp itu target utama kita, yaitu harga rumah dalam rupiah. Kalau datanya kosong, kita nggak bisa pakai baris itu untuk:
+    - pelatihan model regresi
+    - atau klasifikasi zona harga
+
+# ==== 5. Konversi & isi missing values numerik ====
+num_cols = ["bedrooms", "bathrooms", "land_area", "building_area", "carports", "floors", "garages"]
+for col in num_cols:
+    df[col] = pd.to_numeric(df[col], errors="coerce")
+    df[col].fillna(df[col].median(), inplace=True)
+
+code diatas berfungsi untuk mengkonversi nilai dan mengisi mising value dengan nilai median. 
+    - df[col] = pd.to_numeric(df[col], errors="coerce") :
+        code di atas berfungsi untuk memaksa semua yang ada di colom menjadi numerik, errors="coerce" berfungsi apabila terdapat angka selain numerik maka akan ubah menjadi NaN
+        ada 3 macam error pada parameter ini yaitu coerce, ignore dan raise. ignore = biarin, raise = langsung lempar ke error program berhenti, coerce = Merubahnya menjadi NaN
+
+    - df[col].fillna(df[col].median(), inplace=True) : 
+    berfungsi untuk mengisi nilai yang NaN menjadi hal tertentu. dalam kasus tersebut, code mengubahnya menjadi nilai median (nilai tengah  dari nilai yang ada pada colom) inplace=True mengubah langsung nilai tanpa membuat variable bareu
+
+# ==== 6. Lat Long ====
+df["lat"] = pd.to_numeric(df["lat"], errors="coerce")
+df["long"] = pd.to_numeric(df["long"], errors="coerce")
+df["lat"].fillna(df["lat"].median(), inplace=True)
+df["long"].fillna(df["long"].median(), inplace=True)
+num_cols += ["lat", "long"]
+
+code diatas berfungsi untuk membaca dan memaksa kolom lat dan long menjadi kolom numerik apabila kosong maka akan diisi oleh nilai NaN.
+kemudian nilai yang NaN akan diisi oleh nilai median (nilai tengah dari colom tersebut)
+
+# ==== 7. Isi missing value kategori ====
+df["city"].fillna("unknown", inplace=True)
+df["district"].fillna("unknown", inplace=True)
+df["property_type"].fillna("unknown", inplace=True)
+
+code tersebut berfungsi untuk mengisi data yang memiliki nilai kosong (NaN) menjadi kata unknown.
+
+# ==== 8. Hapus outlier harga (IQR) ====
+Q1 = df["price_in_rp"].quantile(0.25)
+Q3 = df["price_in_rp"].quantile(0.75)
+IQR = Q3 - Q1
+lower = Q1 - 1.5 * IQR
+upper = Q3 + 1.5 * IQR
+df = df[(df["price_in_rp"] >= lower) & (df["price_in_rp"] <= upper)]
+print(f"Q1 = {Q1}")
+print(f"Q3 = {Q3}")
+print(f"IQR = {IQR}")
+print(f"lower = {lower}")
+print(f"upper = {upper}")
+
+
+code diatas berfungsi untuk menghapus nilai outlier yang ada pada colom price_in_rp (harga rumah) menggunakan metode IQR (interquartil)
+Interquartile Range (IQR) adalah ukuran statistik yang digunakan untuk melihat sebaran 50% data tengah,
+dan sering digunakan sebagai dasar untuk mendeteksi dan mengabaikan data outlier,
+yaitu nilai-nilai yang jauh lebih kecil dari Q1 - 1.5×IQR atau jauh lebih besar dari Q3 + 1.5×IQR.
+
+# ==== 9. Fitur tambahan ====
+df["building_ratio"] = df["building_area"] / (df["land_area"] + 1)
+df["room_ratio"] = df["bedrooms"] / (df["bathrooms"] + 1)
+df["luas_per_kamar"] = df["building_area"] / (df["bedrooms"] + 1)
+df["kamar_mandi_per_kamar"] = df["bathrooms"] / (df["bedrooms"] + 1)
+
+code diatas berfungsi sebagai "feature engineering" — yaitu proses menambahkan fitur yang bisa memberikan informasi tambahan kepada model machine learning agar prediksinya makin akurat.
+penambahan fitur fitur tersebut berfungsi untuk memperkuat saat melatih model agar lebih manusiawi.
+contohnya : 
+    - misalnya terdapat 2 rumah dengan luas tanah yang sama tapi memiliki fitur seperti (kamar, kamarmandi, luas bangunan) yang berbeda.
+    - Dua rumah bisa sama-sama punya luas bangunan 100 m², tapi jika yang satu punya 2 kamar dan yang satu 5 kamar, artinya "luas per kamar"-nya beda jauh.
+    - Atau rumah A dan B punya luas tanah 200 m², tapi A bangunan 180 m² dan B hanya 60 m² → building ratio beda banget.
+    - adang kamar mandi terlalu sedikit dibanding kamar → bikin tidak nyaman → harga bisa lebih rendah.
+
+Fitur-fitur seperti rasio ini memberikan konteks. Bukan hanya angka mentah, tapi perbandingan antar fitur. Ini sangat membantu model memahami struktur rumah secara lebih "manusiawi".
+
+# ==== 10. Transformasi harga ====
+df["log_price"] = np.log1p(df["price_in_rp"])
+
+digunakan untuk membuat kolom baru bernama log_price, yang berisi nilai harga rumah (price_in_rp) yang telah ditransformasi menggunakan logaritma natural (dengan basis bilangan Euler, 𝑒 ≈ 2.718 e≈2.718).
+Transformasi ini dilakukan karena distribusi harga rumah cenderung sangat tidak merata (skewed to the right). Artinya, sebagian besar rumah mungkin memiliki harga dalam kisaran ratusan juta hingga beberapa miliar, namun ada juga beberapa rumah dengan harga sangat tinggi, bahkan mencapai puluhan miliar.
+Jika nilai-nilai ekstrem ini dibiarkan dalam bentuk aslinya, mereka bisa membebani model machine learning, membuat model terlalu fokus mengejar nilai-nilai besar, dan mengorbankan akurasi untuk data yang lebih umum.
+Dengan transformasi logaritma, perbedaan skala antar harga menjadi lebih kecil dan data menjadi lebih normal atau simetris, sehingga:
+    - Model menjadi lebih stabil saat belajar
+    - Prediksi menjadi lebih realistis
+    - Pengaruh outlier bisa diredam secara matematis
+
+rumus :
+    - ln(x)=y ⟺ e pangkat y = x
+penjelasan :
+    - ln(x) adalah logaritma natural dari 𝑥
+    - e ≈ 2.718 adalah bilangan Euler (konstanta matematika alami)
+    - y adalah hasil logaritma, yaitu pangkat dari e yang akan menghasilkan x
+
+contoh kasus :
+    Jika 𝑥 = 400,000,000 
+maka:
+    ln(400000000) ≈ 19.80
+karena : 
+    e pangkat 19.80 = 400000000
+
+versi lebih seder hana :
+Kita ubah harga rumah jadi bentuk log supaya model gak “kaget” lihat harga rumah 50 M, padahal mayoritas harganya cuma 500 juta.
+Dengan log, selisih harga jadi terasa “lebih halus”, dan model bisa belajar lebih tenang dan akurat.
+
+# ==== 11. Label zona harga global (v2-style) ====
+p33 = df["price_in_rp"].quantile(0.33)
+p66 = df["price_in_rp"].quantile(0.66)
+
+def global_zone_label(price):
+    if price < p33:
+        return "murah"
+    elif price < p66:
+        return "sedang"
+    else:
+        return "mahal"
+
+df["price_category"] = df["price_in_rp"].apply(global_zone_label)
+
+code diatas berfungsi untuk mengelompokkan harga rumah menjadi 3 kategori zona harga yaitu murah, sedang, dan mahal.
+cara kerjanya :
+1. pertama program menghitung percentil batas batas percentil dari data, yaitu pada code :
+    p33 = df["price_in_rp"].quantile(0.33)
+    p66 = df["price_in_rp"].quantile(0.66)
+
+        - p33: nilai di mana 33% data harga berada di bawahnya.
+        - p66: nilai di mana 66% data harga berada di bawahnya.
+
+2. dan ketika sudah mendapatkan angka percentil, maka kita membuat sebuah function yang bernama global_zone_label untuk memetakan satu harga (price) menjadi salah satu dari tiga label tersebut yaitu pada code :
+def global_zone_label(price):
+    if price < p33:
+        return "murah"
+    elif price < p66:
+        return "sedang"
+    else:
+        return "mahal"
+
+3. kemudian setelah membuat function maka langkah selanjutnya adalah mengimplementasikan function tersebut ke dalam colom price_category yaitu pada code :
+df["price_category"] = df["price_in_rp"].apply(global_zone_label)
+
+contohnya :
+
+Jika p33 = 700 juta dan p66 = 1.5 miliar
+
+maka rumah dengan harga kurang dari 700 juta akan masuk ke kategori murah, rumah dengan harga kurang dari 1.5 M dianggap sedang, dan yang lebih dari 1.5 M dianggap Mahal.
+
+Kenapa Ini Penting dalam Program Kita?
+1. Untuk chatbot:
+    Ketika pengguna bertanya: "Saya ingin rumah 2 kamar di Bekasi", chatbot bisa menebak estimasi harga dan menyebutkan "zona harga" (murah/sedang/mahal).
+2. Untuk pelabelan model klasifikasi zona:
+    Kolom price_category ini akan digunakan sebagai label target saat kita melatih model klasifikasi zona (model_zone_classifier.pkl).
+3. Mempermudah analisis & segmentasi pengguna:
+    Kalau nanti kamu bikin grafik atau dashboard, kamu bisa cepat filter rumah berdasarkan kategori ini.

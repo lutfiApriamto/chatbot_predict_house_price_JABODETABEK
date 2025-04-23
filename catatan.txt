@@ -1,0 +1,24 @@
+💬 1. Tujuan Program
+Chatbot ini dibuat untuk membantu pengguna mencari rumah di wilayah Jabodetabek berdasarkan:
+
+Spesifikasi rumah yang mereka inginkan (input fitur properti), atau
+
+Budget (anggaran dana) yang mereka miliki
+
+
+🔁 2. Alur Percakapan Secara Umum
+1. User memberikan pertanyaan → contoh: "Saya ingin rumah 3 kamar tidur di Bekasi."
+
+2. Chatbot mendeteksi niat (intent) → apakah user ingin tanya harga, cari rumah, atau tanya dari budget.
+
+3. Ekstraksi informasi dari teks user: jumlah kamar, lokasi, luas tanah, dst.
+
+4. Sistem mengisi informasi ke konteks sesi (session_context) → agar dapat dilengkapi bertahap kalau belum lengkap.
+
+5. Jika semua data lengkap dan valid, sistem:
+
+    - Menggunakan model prediksi zona dan harga
+
+    - Memberikan estimasi harga dan contoh lokasi
+
+6. Jika ada data tidak wajar → chatbot memberikan peringatan dan minta user input ulang
