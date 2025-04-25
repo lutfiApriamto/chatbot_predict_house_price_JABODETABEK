@@ -181,3 +181,57 @@ Kenapa Ini Penting dalam Program Kita?
     Kolom price_category ini akan digunakan sebagai label target saat kita melatih model klasifikasi zona (model_zone_classifier.pkl).
 3. Mempermudah analisis & segmentasi pengguna:
     Kalau nanti kamu bikin grafik atau dashboard, kamu bisa cepat filter rumah berdasarkan kategori ini.
+
+
+# ==== 12. One-hot encoding ====
+df = pd.get_dummies(df, columns=["city", "district", "property_type"], drop_first=True)
+
+code diatas berfungsi untuk melakukn one hot encoding untuk fitur city, district dan property_type.
+one-hot encoding adalah sebuah cara untuk merubah data kategorikal menjadi numerik supaya bisa dikenali oleh mesin
+drop_first=True adalah trik untuk menghindari informasi yang terlalu banyak tapi tidak perlu, supaya model machine learning tidak bingung dan lebih efisien dalam belajar.
+
+    Kenapa One-Hot Encoding Penting?
+        1. Komputer/machine learning tidak bisa memahami teks
+        2. Menghindari asumsi urutan/besaran pada data kategorikal
+        3. Membantu model mengenali lokasi, jenis properti, dll
+        4. Menjadikan data bentuk angka biner (0/1) → mudah diproses
+        5. Mencegah multikolinearitas dengan drop_first=True
+
+# ==== 13. Simpan kolom fitur utama ====
+features = num_cols + [
+    "building_ratio", "room_ratio", "luas_per_kamar", "kamar_mandi_per_kamar"
+] + [col for col in df.columns if col.startswith("city_") or col.startswith("property_type_") or col.startswith("district_")]
+
+with open("models/feature_columns.json", "w") as f:
+    json.dump(features, f)
+
+Potongan kode pada bagian ini berfungsi untuk menentukan dan menyimpan fitur-fitur penting (fitur utama) yang akan digunakan oleh model machine learning,
+baik saat pelatihan (training) maupun saat prediksi (inference). Fitur-fitur ini disebut sebagai "feature set".
+
+# ==== 14. Simpan data model ====
+df_model = df[features + ["log_price", "price_category", "price_in_rp"]]
+df_model.to_csv("data/processed/preprocessed_final.csv", index=False)
+
+"Code di atas berfungsi untuk menyimpan hasil akhir dari proses preprocessing ke dalam file bernama preprocessed_final.csv.
+File ini hanya berisi fitur yang dibutuhkan oleh model, serta kolom target seperti harga logaritmik, kategori harga, dan harga asli.
+Data ini nantinya akan digunakan untuk pelatihan dan prediksi model pada chatbot."
+
+Potongan kode ini digunakan untuk mempersiapkan data khusus chatbot agar bisa memahami dan memberi jawaban berdasarkan zona harga rumah (murah, sedang, mahal) di setiap kota.
+Langkah-langkah yang dilakukan:
+    1. Membaca ulang data mentah dari file asli (jabodetabek_house_price.csv).
+    2. Menghapus baris yang tidak memiliki harga, karena harga adalah komponen penting.
+    3. Mengelompokkan wilayah Jakarta secara spesifik ke dalam "jakarta selatan", "jakarta timur", dst.
+    4. Mengelompokkan harga rumah di setiap kota ke dalam kategori 'murah', 'sedang', dan 'mahal'. Ini dilakukan dengan cara membagi data harga menjadi 3 bagian (persentil 33% dan 66%) untuk setiap kota secara terpisah. Hal ini membuat pembagian zona harga lebih adil dan kontekstual sesuai wilayah.
+
+Hasil dari proses ini akan digunakan oleh chatbot untuk memberikan contoh lokasi dan estimasi harga yang relevan berdasarkan kota dan zona harga tertentu.
+
+df_chatbot = df_chatbot[["city", "district", "price_in_rp", "price_category", "land_area", "bedrooms", "bathrooms"]]
+df_chatbot.to_csv("data/processed/zone_label.csv", index=False)
+
+print("Jumlah data akhir:", df_model.shape)
+print("Data berhasil diproses dan disimpan ✅")
+
+Potongan kode ini menyimpan data yang sudah dikelompokkan ke dalam kategori zona harga (murah, sedang, mahal) khusus untuk chatbot.
+ Kolom yang dipilih berisi lokasi, harga, dan spesifikasi rumah, lalu disimpan ke file zone_label.csv
+  yang nantinya digunakan chatbot sebagai referensi saat menjawab pertanyaan pengguna.
+

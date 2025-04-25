@@ -22,3 +22,26 @@ Budget (anggaran dana) yang mereka miliki
     - Memberikan estimasi harga dan contoh lokasi
 
 6. Jika ada data tidak wajar → chatbot memberikan peringatan dan minta user input ulang
+
+
+Rule-based classification adalah metode pengelompokan data berdasarkan aturan atau kondisi yang kita tentukan sendiri secara eksplisit.
+Kita tidak menggunakan model atau algoritma machine learning untuk membuat kategori ini. Semua keputusan berasal dari aturan logika yang kita tulis sendiri.
+
+🧠 Mengapa kita pakai metode ini?
+1. Tidak butuh label manual. Kita tidak punya kolom "kategori harga" yang sudah tersedia di data mentah.
+2. Cepat dan simpel. Bisa langsung digunakan tanpa pelatihan model apapun.
+3. Distribusi relatif. Dengan kuantil, kategori menyesuaikan dengan distribusi harga di data. Ini penting karena:
+    - Harga rumah di Jakarta mungkin beda jauh dengan harga rumah di Bogor.
+    - Tapi dengan kuantil, "mahal" di Bogor tetap berarti sebagian kecil harga termahal di Bogor.
+
+Rekomendasi jawaban versi kuat, teknis, dan elegan apabila ditanya mengapa menggunakan 4 fitur utama:
+"Keempat fitur utama — yaitu luas tanah, luas bangunan, jumlah kamar tidur, dan jumlah kamar mandi — merupakan fitur yang paling berpengaruh terhadap harga rumah berdasarkan analisis korelasi dan pemahaman domain properti.
+Selain itu, fitur-fitur tersebut juga digunakan untuk membentuk fitur turunan seperti building_ratio, room_ratio, luas_per_kamar, dan kamar_mandi_per_kamar, yang terbukti meningkatkan akurasi model.
+ Karena sifatnya yang esensial dan berkaitan langsung dengan estimasi harga, maka fitur ini dijadikan input wajib untuk chatbot.
+Sementara itu, fitur seperti carport, garasi, dan jumlah lantai bersifat opsional karena tidak selalu tersedia atau tidak terlalu dominan pengaruhnya dalam model prediksi kami."
+
+📌 Tips jika dosen bertanya lebih dalam:
+    - Kenapa tidak pakai room_ratio langsung?
+        Karena pengguna umumnya tidak tahu rasio — tapi mereka tahu jumlah kamar tidur dan kamar mandi. Jadi kita gunakan input yang intuitif lalu hitung rasionya di belakang layar.
+    - Kenapa tidak minta jumlah garasi?
+        Karena tidak semua rumah memiliki garasi, dan kadang pengguna juga tidak mencantumkannya. Jadi kita hanya gunakan jika tersedia.

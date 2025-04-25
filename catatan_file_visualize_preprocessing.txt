@@ -1,0 +1,42 @@
+✅ 1. Distribusi Harga Asli vs Harga Setelah Transformasi Log
+📊 Visualisasi:
+    - Histogram harga rumah asli (sumbu X: harga, sumbu Y: jumlah rumah)
+    - Histogram harga rumah setelah transformasi log
+
+🎯 Tujuan & Fungsi:
+    - Untuk menunjukkan bahwa data harga rumah asli memiliki distribusi skewed (condong ke kanan) — banyak rumah murah, sedikit rumah sangat mahal.
+    - Setelah transformasi log, distribusi menjadi lebih simetris, yang sangat membantu dalam pelatihan model machine learning karena model cenderung bekerja lebih baik jika data mendekati distribusi normal.
+
+✅ 2. Histogram Harga Rumah (Asli) Berdasarkan Zona Harga
+📊 Visualisasi:
+    - Histogram dengan warna berbeda berdasarkan kategori harga (`murah`, `sedang`, `mahal`) sebelum transformasi log.
+
+🎯 Tujuan & Fungsi:
+    - Untuk memvalidasi proses labeling harga rumah ke zona.
+    - Menunjukkan bahwa kategori harga (`price_category`) sudah membagi data ke dalam tiga kelompok yang cukup jelas berdasarkan harga asli.
+    - Skala log digunakan agar penyebaran harga terlihat lebih proporsional.
+
+✅ 3. Histogram Harga Rumah (Log Transform) Berdasarkan Zona Harga
+📊 Visualisasi:
+    - Histogram log harga dengan pewarnaan per kategori harga (`price_category`)
+
+🎯 Tujuan & Fungsi:
+    - Menunjukkan bahwa setelah transformasi log, pemisahan antar zona harga menjadi lebih merata dan terdistribusi baik.
+    - Membuktikan bahwa kombinasi log transform + pelabelan zona memberi hasil distribusi yang lebih stabil dan informatif untuk model.
+
+✅ 4. Heatmap Korelasi Antar Fitur Numerik
+📊 Visualisasi:
+    - Matriks korelasi antar fitur numerik, ditampilkan dalam bentuk heatmap
+
+🎯 Tujuan & Fungsi:
+    - Untuk melihat seberapa besar keterkaitan (korelasi) antar fitur dengan harga (log_price) maupun antar fitur itu sendiri.
+    - Bisa digunakan sebagai dasar logis pemilihan fitur — misalnya, fitur yang punya korelasi tinggi dengan harga dianggap lebih penting.
+
+✅ 5. Scatterplot: Luas Tanah vs Harga Rumah
+📊 Visualisasi:
+    - Plot sebar antara `land_area` (sumbu X) dan `price_in_rp` (sumbu Y)
+
+🎯 Tujuan & Fungsi:
+    - Menunjukkan hubungan langsung antara luas tanah dan harga rumah.
+    - Semakin besar tanah, secara umum harga juga meningkat — tapi dengan penyebaran yang sangat luas (makanya pakai log-scale di sumbu Y).
+    - Visual ini membantu menjelaskan kenapa luas tanah menjadi salah satu fitur utama chatbot.
