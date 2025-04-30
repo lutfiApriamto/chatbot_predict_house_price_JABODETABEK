@@ -45,3 +45,27 @@ Sementara itu, fitur seperti carport, garasi, dan jumlah lantai bersifat opsiona
         Karena pengguna umumnya tidak tahu rasio — tapi mereka tahu jumlah kamar tidur dan kamar mandi. Jadi kita gunakan input yang intuitif lalu hitung rasionya di belakang layar.
     - Kenapa tidak minta jumlah garasi?
         Karena tidak semua rumah memiliki garasi, dan kadang pengguna juga tidak mencantumkannya. Jadi kita hanya gunakan jika tersedia.
+
+
+penjelasn 3 model utama :
+
+    1. model_best_regression.pkl – Regresi Harga Rumah :
+        - Ini adalah model utama untuk memprediksi angka harga rumah.
+        - Misalnya: input fitur rumah → output: Rp 850.000.000
+        - Dibangun dengan XGBoost (setelah melalui proses model_comparison.py)
+        - Digunakan saat user ingin prediksi harga detail berdasarkan fitur lengkap rumah.
+
+    2. model_zone_classifier.pkl – Klasifikasi Zona Harga :
+        - Ini adalah model klasifikasi untuk menentukan apakah rumah
+            - Masuk ke zona "murah", "sedang", atau "mahal"
+        - Output bukan angka, tapi label kategori.
+        - Model ini dibutuhkan agar chatbot bisa memberikan jawaban cepat dan ringkas kepada user.
+        - Misalnya: "Saya punya rumah di Depok, tanah 90m², bangunan 100m²" → chatbot jawab: "Itu termasuk zona sedang."
+
+    3.  nlp_model.pkl – Model NLP Intent Classifier :
+        - Ini adalah model machine learning untuk memahami maksud atau niat pengguna.
+        - Misalnya:
+            - User tanya: “Bisa bantu hitung harga rumah saya?”
+            - Model akan mengklasifikasi itu sebagai “estimasi harga”
+        - Model ini digunakan sebagai otak chatbot, supaya bisa menanggapi pertanyaan dengan cara yang tepat.
+

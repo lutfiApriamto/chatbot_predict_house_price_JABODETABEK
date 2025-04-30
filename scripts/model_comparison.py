@@ -3,11 +3,19 @@
 import pandas as pd
 import numpy as np
 import json
-import joblib
+import matplotlib.pyplot as plt
+import seaborn as sns
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
-# ==== 1. Load Data ====
+# ==== 1. Define Models ====
+from sklearn.linear_model import LinearRegression
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from sklearn.svm import SVR
+from xgboost import XGBRegressor
+
+# ==== 2. Load Data ====
 df = pd.read_csv("data/processed/preprocessed_final.csv")
 with open("models/feature_columns.json", "r") as f:
     features = json.load(f)
@@ -15,26 +23,15 @@ with open("models/feature_columns.json", "r") as f:
 X = df[features]
 y = df["log_price"]
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-# ==== 2. Define Models ====
-from sklearn.linear_model import LinearRegression, Ridge, Lasso
-from sklearn.tree import DecisionTreeRegressor
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
-from sklearn.svm import SVR
-from xgboost import XGBRegressor
-from lightgbm import LGBMRegressor
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
 models = {
     "LinearRegression": LinearRegression(),
-    "Ridge": Ridge(),
-    "Lasso": Lasso(),
     "DecisionTree": DecisionTreeRegressor(),
     "RandomForest": RandomForestRegressor(),
     "GradientBoosting": GradientBoostingRegressor(),
     "SVR": SVR(),
     "XGBoost": XGBRegressor(objective='reg:squarederror'),
-    "LightGBM": LGBMRegressor(),
 }
 
 # ==== 3. Train & Evaluate ====
@@ -57,15 +54,37 @@ for name, model in models.items():
 
     print(f"Model {name} - MAE: {mae:.4f}, RMSE: {rmse:.4f}, R2: {r2:.4f}")
 
-# ==== 4. Pilih model terbaik (berdasarkan R2) dan simpan ====
+# ==== 4. Pilih model terbaik (berdasarkan R2) ====
 best_model = max(results, key=lambda x: x["R2"])
-final_model = models[best_model["model"]]
-final_model.fit(X, y)
-joblib.dump(final_model, "models/model_best_regression.pkl")
-
-print("\nModel terbaik:", best_model["model"])
-print("Model disimpan ke models/model_best_regression.pkl")
+print("\nModel terbaik berdasarkan R2 Score adalah:", best_model["model"])
 
 # ==== 5. Simpan hasil evaluasi ====
 pd.DataFrame(results).to_csv("output/model_comparison_result.csv", index=False)
 print("Hasil evaluasi disimpan ke output/model_comparison_result.csv ✅")
+
+# Konversi results ke DataFrame
+df_results = pd.DataFrame(results)
+
+# 1. Histogram MAE
+plt.figure(figsize=(10, 6))
+sns.barplot(x="model", y="MAE", data=df_results, palette="Blues_d")
+plt.title("Perbandingan MAE antar Model")
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+
+# 2. Histogram RMSE
+plt.figure(figsize=(10, 6))
+sns.barplot(x="model", y="RMSE", data=df_results, palette="Greens_d")
+plt.title("Perbandingan RMSE antar Model")
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+
+# 3. Histogram R2
+plt.figure(figsize=(10, 6))
+sns.barplot(x="model", y="R2", data=df_results, palette="Purples_d")
+plt.title("Perbandingan R2 Score antar Model")
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()

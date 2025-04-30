@@ -1,0 +1,240 @@
+Fungsi Utama File model_comparison.py
+File ini bertujuan untuk:
+    - Membandingkan berbagai model Machine Learning (model regresi) untuk memprediksi harga rumah.
+    - Memilih model terbaik berdasarkan skor evaluasi (R² terbaik).
+    - Menyimpan model terbaik supaya nanti bisa dipakai untuk chatbot-mu saat estimasi harga rumah.
+    - Mencatat hasil perbandingan semua model supaya bisa dianalisis di kemudian hari.
+Singkatnya:
+➡️ Ini adalah tahap "pemilihan otak" yang terbaik untuk chatbotmu.
+
+Alur Lengkap Program model_comparison.py
+1. Load Data:
+    - Membaca file preprocessed_final.csv hasil preprocessing.
+    - Membaca daftar fitur penting dari feature_columns.json.
+    - Memisahkan data menjadi X (fitur) dan y (target = log_price).
+
+2. Split Data: Training dan Testing:
+    Data dipecah:
+    - 80% untuk melatih model (X_train, y_train)
+    - 20% untuk menguji model (X_test, y_test)
+
+3. Define Models :
+    - Menggunakan berbagai algoritma Machine Learning:
+        - Linear Regression, Ridge, Lasso
+        - Decision Tree, Random Forest
+        - Gradient Boosting
+        - SVR
+        - XGBoost
+        - LightGBM
+    - Semua model ini bertugas untuk mempelajari hubungan antara fitur rumah dan harga.
+
+4. Train & Evaluate
+    - Semua model dilatih (fit) di data training.
+    - Lalu diuji di data testing.
+    - Dihitung 3 skor evaluasi:
+        - MAE (Mean Absolute Error): seberapa rata-rata kesalahan prediksi (semakin kecil semakin bagus).
+        - RMSE (Root Mean Squared Error): mirip MAE, tapi lebih sensitif terhadap kesalahan besar.
+        - R² Score: seberapa baik model menjelaskan variasi data (semakin mendekati 1 makin bagus).
+
+5. Pilih Model Terbaik
+    - Model yang punya R² terbesar akan dipilih.
+    - Model terbaik ini dilatih ulang dengan semua data (X dan y) untuk memaksimalkan ilmunya.
+
+6. Simpan Model Terbaik
+    - Disimpan ke file models/model_best_regression.pkl menggunakan joblib.
+    - Tujuannya nanti chatbot bisa cepat pakai tanpa perlu training ulang.
+
+7. Simpan Hasil Evaluasi
+    - Semua skor MAE, RMSE, R² dari semua model disimpan ke output/model_comparison_result.csv untuk dokumentasi dan analisis.
+
+Pengaruh File Ini untuk Project Chatbot Rumah
+Tanpa file ini:
+    - Chatbot-mu tidak tahu model mana yang terbaik untuk memprediksi harga.
+    - Tidak ada model .pkl yang bisa dipanggil untuk melakukan prediksi cepat di backend chatbot.
+    - Tidak ada catatan evaluasi sehingga kamu tidak tahu model mana yang performanya jelek/bagus.
+Artinya: Ini file yang sangat krusial untuk menyiapkan "otak" chatbotmu agar bisa menebak harga rumah dengan cerdas.
+
+bahasan file perpotongan code :
+
+import pandas as pd
+import numpy as np
+import json
+import joblib
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+
+# ==== 1. Define Models ====
+from sklearn.linear_model import LinearRegression, Ridge, Lasso
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from sklearn.svm import SVR
+from xgboost import XGBRegressor
+from lightgbm import LGBMRegressor
+
+code diatas berfungsi untuk mendefinisikan library internal maupun external yang akan digunakan selama pelatihan model dalam file.
+
+df = pd.read_csv("data/processed/preprocessed_final.csv")
+with open("models/feature_columns.json", "r") as f:
+    features = json.load(f)
+
+X = df[features]
+y = df["log_price"]
+
+code di atas berfungsi untuk membaca data dari file preprocessed_final.csv dan juga file feature_columns.json.
+setelah membaca data code mendefinisikan variable x dan y dimana :
+    - X = df[features] = akan berisi semua nilai yang ada pada file feature_columns.json
+    - y = df["log_price"] = akan berisi nilai coloum "log_price" yang ada padaa file preprocessed_final.csv
+
+pemisahan X sebagai fitur dan y sebagai target untuk mengikuti prinsip supervised learning.
+X berisi semua informasi properti yang diketahui, sedangkan y adalah harga rumah yang sudah dihitung menggunakan logaritma natural (log_price) yang ingin diprediksi.
+Ini penting supaya model bisa belajar pola hubungan antara karakteristik rumah dan harganya. 
+Jika X atau y salah isi, maka model akan belajar pola yang salah dan prediksinya menjadi tidak akurat.
+Fitur X digunakan untuk memberikan informasi lengkap tentang properti yang akan diprediksi,
+sedangkan y adalah harga rumah (log_price) yang menjadi target prediksi.
+Kalau X atau y diubah tanpa perencanaan, maka model akan salah belajar dan hasil prediksi akan buruk.
+Oleh karena itu, pemilihan X dan y harus konsisten dengan tujuan program.
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+code diatas berfungsi untuk membagi data menjadi training dan testing supaya model bisa dievaluasi dengan jujur di data yang tidak pernah dilihat.
+dan pada code tersebut, data dibagi menjadi 80% data latih dan 20% data test.
+Teknik ini dipilih karena cepat, sederhana, dan cocok untuk dataset yang tidak terlalu kecil maupun terlalu besar.
+
+logika code per syntax :
+    1. X_train, X_test, y_train, y_test :
+        - X_train ➔ data input (fitur) untuk melatih model.
+        - X_test ➔ data input (fitur) untuk menguji model.
+        - y_train ➔ target output (harga rumah log) untuk melatih model.
+        - y_test ➔ target output (harga rumah log) untuk menguji model.
+    Kenapa perlu empat variabel? Karena:
+        - Kita mau melatih model pakai input (X) dan jawaban (y).
+        - Kita mau menguji model pakai input (X) dan membandingkan prediksi dengan jawaban sebenarnya (y).
+    
+    2. train_test_split(X, y, test_size=0.2, random_state=42) :
+        - Ini adalah fungsi dari sklearn.model_selection yang berfungsi untuk:
+            - Membagi dataset (X dan y) menjadi dua bagian:
+                - Training set
+                - Testing set
+
+            - Apa isi parameter-parameter dalam fungsi ini :
+                - X ➔ semua fitur input (bedrooms, bathrooms, land_area, dll).
+                - y ➔ target output yaitu log_price.
+                - test_size=0.2 ➔ artinya:
+                    - 20% data ➔ untuk testing.
+                    - 80% data ➔ untuk training.
+                - ➔ kalau total data 3000:
+                    - 2400 data untuk training
+                    - 600 data untuk testing
+                - random_state=42 ➔ untuk mengunci pembagian data supaya selalu sama setiap kali program dijalankan.
+                  Kalau tidak dikunci, pembagian data bisa berubah-ubah setiap run!
+                  sebenarnya random_state itu untuk "mengatur hasil acak" supaya tetap sama setiap kita jalankan programnya.
+                  random_state dibutuhkan karena  saat train_test_split, sebenarnya data itu diacak dulu sebelum dibagi.
+                  Kalau tidak dikunci, setiap kali kamu jalanin program, hasil pembagian training/testing beda-beda.
+                  maka acakannya akan selalu sama, pembagiannya akan selalu konsisten setiap program dijalankan.
+
+models = {
+    "LinearRegression": LinearRegression(),
+    "Ridge": Ridge(),
+    "Lasso": Lasso(),
+    "DecisionTree": DecisionTreeRegressor(),
+    "RandomForest": RandomForestRegressor(),
+    "GradientBoosting": GradientBoostingRegressor(),
+    "SVR": SVR(),
+    "XGBoost": XGBRegressor(objective='reg:squarederror'),
+    "LightGBM": LGBMRegressor(),
+}
+
+code diatas merupakan sebuah dictionary yang bernama models. dictionary models akan berisi key and value pairs yang dimana keynya adalah nama algoritma dan
+valuenya adalah sebuah object model (fungsi) dari library sklearn, xgboost LGBMRegressor dan lain sebagainya.
+Tujuannya: kita bikin semua model yang mau dicoba disimpan di satu tempat supaya nanti bisa dilatih dan dibandingkan performanya satu per satu secara otomatis. 🚀
+
+penjelasan model secara singkat :
+
+    Model | Penjelasan Singkat | Kapan Bagus Digunakan
+    - LinearRegression | Model prediksi paling dasar. Mencari garis lurus terbaik. | Data sederhana, hubungan linear
+    - Ridge | Linear Regression + regularisasi L2. Mencegah overfitting. | Kalau data mulai kompleks/overfit
+    - Lasso | Linear Regression + regularisasi L1. Bisa membuat beberapa fitur jadi 0. | Kalau mau otomatis seleksi fitur
+    - DecisionTreeRegressor | Model pohon keputusan. Membuat aturan if-else untuk memprediksi. | Data nonlinear, mudah dipahami
+    - RandomForestRegressor | Gabungan banyak Decision Tree. Lebih akurat dan stabil. | Data kompleks, mau akurasi bagus
+    - GradientBoostingRegressor | Model boosting (perbaiki error bertahap). Akurasi tinggi, tapi lebih lambat. | Saat butuh prediksi sangat akurat
+    - SVR (Support Vector Regression) | Model berbasis margin. Fokus ke data yang paling "krusial". | Data kecil-menengah, hubungan rumit
+    - XGBoost | Versi upgrade dari Gradient Boosting. Super cepat dan powerful. | Kompetisi machine learning, data besar
+    - LightGBM | Boosting model super cepat dan ringan. Cocok untuk data sangat besar. | Data ribuan-sampai jutaan baris
+
+# ==== 3. Train & Evaluate ====
+results = []
+
+for name, model in models.items():
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+
+    mae = mean_absolute_error(y_test, y_pred)
+    rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+    r2 = r2_score(y_test, y_pred)
+
+    results.append({
+        "model": name,
+        "MAE": mae,
+        "RMSE": rmse,
+        "R2": r2
+    })
+
+    print(f"Model {name} - MAE: {mae:.4f}, RMSE: {rmse:.4f}, R2: {r2:.4f}")
+
+code tersebut adalah sebuah iterasi yang berfungsi untuk melatih model secara bertahap. 
+
+    1.  results = []
+        - Ini menginisialisasi list kosong yang akan digunakan untuk menyimpan hasil evaluasi dari setiap model.
+          Setiap hasil model (MAE, RMSE, R²) nanti akan ditambahkan (append) ke dalam list results ini.
+    
+    2. Perulangan for name, model in models.items():
+        - Artinya:
+            - Ambil pasangan key-value dari dictionary models.
+            - name → nama modelnya, misal "LinearRegression".
+            - model → objek model Scikit-learn-nya.
+
+    3. model.fit(X_train, y_train)
+        - Ini artinya: model dilatih! :
+            - model.fit() → fungsi untuk melatih model menggunakan data training.
+            - X_train → fitur-fitur input (seperti luas tanah, kamar tidur, dsb.) untuk melatih model.
+            - y_train → target outputnya (dalam kasus ini = harga rumah dalam bentuk log_price).
+    
+    4. y_pred = model.predict(X_test)
+        - ✅ Ini artinya: model memprediksi!
+            - Setelah dilatih, model mencoba memprediksi hasil dari data test X_test.
+            - y_pred → adalah hasil prediksi dari model.
+    
+    5. Evaluasi Performa Model
+    Setelah model memprediksi (y_pred), kita ukur seberapa akurat prediksi model:
+        - mae = mean_absolute_error(y_test, y_pred) :
+            - MAE (Mean Absolute Error) = rata-rata selisih mutlak antara nilai asli (y_test) dan prediksi (y_pred).Semakin kecil MAE, semakin bagus modelnya.
+            - rmse = np.sqrt(mean_squared_error(y_test, y_pred)) = RMSE (Root Mean Squared Error) = akar dari rata-rata kuadrat error. Mirip MAE, tapi lebih "keras" menghukum kesalahan besar.
+            - r2 = r2_score(y_test, y_pred) = R² Score = seberapa baik prediksi model menjelaskan variasi dari data sebenarnya. Semakin mendekati 1.0 → semakin bagus. (Kalau 1, model sempurna.)
+
+
+# ==== 4. Pilih model terbaik (berdasarkan R2) dan simpan ====
+best_model = max(results, key=lambda x: x["R2"])
+final_model = models[best_model["model"]]
+final_model.fit(X, y)
+joblib.dump(final_model, "models/model_best_regression.pkl")
+
+print("\nModel terbaik:", best_model["model"])
+print("Model disimpan ke models/model_best_regression.pkl")
+
+inti dari code diatas berfungsi untuk memilih model terbaik dari hasil pelatihan menggunakan beberapa cara. yaitu :
+
+    1. best_model = max(results, key=lambda x: x["R2"]):
+        - results adalah list berisi hasil evaluasi semua model (kamu sudah buat di langkah sebelumnya).
+        - max() adalah fungsi Python untuk mencari nilai maksimum dari list.
+        - key=lambda x: x["R2"] artinya:
+            - Untuk setiap item x di dalam results, ambil nilai x["R2"].
+            - Pilih model yang punya R2 paling tinggi (ingat: R2 makin tinggi makin bagus!).
+        
+        - Tujuan: Menentukan model dengan akurasi terbaik berdasarkan skor R2.
+        - Teknik yang digunakan: Model Selection → pemilihan model berdasarkan metrik evaluasi tertentu (di sini pakai R2).
+    
+    2. final_model = models[best_model["model"]] :
+        - best_model["model"] → ambil nama model dari hasil pencarian best_model (misal "RandomForest").
+        - models[best_model["model"]] → ambil objek model aslinya dari dictionary models.
+        - Tujuan: Setelah tahu model mana yang terbaik, kita ambil objek modelnya supaya bisa dipakai lagi.
+    

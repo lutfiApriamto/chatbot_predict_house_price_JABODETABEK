@@ -1,0 +1,133 @@
+
+import pandas as pd
+import json
+import joblib
+from xgboost import XGBRegressor
+
+# 1. Load Data
+df = pd.read_csv("data/processed/preprocessed_final.csv")
+with open("models/feature_columns.json", "r") as f:
+    features = json.load(f)
+
+X = df[features]
+y = df["log_price"]
+
+potongan code diatas berfungsi untuk mengimport beberapa pustaka (library) yang akan digunakan selama pelatihan model menggunakan algoritma xgboost
+kemudian pada code selanjutnya berfungsi untuk mambaca (load) data yang ada pada file preprocessed_final.csv dan feature_columns.json yang nantinya akan dijadikan feature X dan Y
+
+# 2. Train Model dengan eval_set untuk rekam metrik pelatihan
+eval_set = [(X, y)]  # gunakan data yang sama karena kita tidak split
+model = XGBRegressor(objective='reg:squarederror', n_estimators=100, eval_metric="mae")
+model.fit(X, y, eval_set=eval_set, verbose=False)
+
+inti dari code nomor dua adalah untuk melatih model menggunakan algoritma XGBRegressor
+
+eval_set = [(X, y)]
+code diatas berfungsi untuk :
+    - data evaluasi yang akan dipantau selama proses pelatihan.
+    -   Bentuknya adalah list yang berisi pasangan (fitur, target) — dalam hal ini (X, y).
+    - Biasanya ini digunakan untuk validasi dengan data test agar kita bisa melihat apakah model terlalu belajar dari data (overfitting).
+    - Tapi karena kamu tidak melakukan train_test_split, maka kamu memakai data yang sama (X, y) sebagai pelatihan dan evaluasi.
+
+kemudian pada code model = XGBRegressor(...)
+XGBRegressor adalah algoritma machine learning dari pustaka XGBoost yang digunakan khusus untuk tugas regresi (memprediksi nilai numerik, misalnya harga rumah).
+beberapa parameter didatamlnya terdapat :
+
+kemudian pada code objective='reg:squarederror' :
+1. "objective" adalah parameter penting yang memberi tahu XGBoost tujuan pelatihannya itu apa (jenis masalah apa yang sedang diselesaikan).
+selain reg:squarederror terdapat beberapa parameter lainnya yang bisa digunakan sesuai dengan jenis tujuan pelatihan model. diantaranya adalah :
+| Nilai Objective          | Artinya                                                           | Kapan Digunakan                                 |
+|--------------------------|-------------------------------------------------------------------|-------------------------------------------------|
+| `'reg:squarederror'`     | Regresi menggunakan mean squared error (MSE) sebagai fungsi loss. | Untuk prediksi nilai numerik seperti harga.     |
+| `'reg:logistic'`         | Regresi logistik (untuk probabilitas).                            | Untuk klasifikasi binary (tidak cocok di sini). |
+| `'binary:logistic'`      | Untuk klasifikasi 2 kelas                                         | Kalau target kita adalah 0 dan 1                |
+| `'multi:softmax'`        | Untuk klasifikasi multi-kelas                                     | Misalnya klasifikasi zona: murah/sedang/mahal   |
+
+alasan memilih parameter objective yang bernilai reg:squarederror:
+    - Karena kita ingin memprediksi harga rumah (nilai numerik)
+        - Jadi ini memberitahu XGBoost bahwa tugas kita adalah regresi murni, dan error-nya dihitung berdasarkan selisih kuadrat antara nilai prediksi dan nilai sebenarnya.
+    - Kalau  tidak menyebutkannya secara eksplisit, XGBoost memang bisa mendeteksi secara otomatis.
+    - penggunaan parameter objective secara manual,  konsistensi dan bisa menghindari kesalahan jenis prediksi (misalnya salah mendeteksi sebagai klasifikasi) dapat dihindari saat pelatihan model.
+    - Dan ini juga membuat hasil model lebih reproducible (mudah diulangi dengan hasil sama).
+
+
+2. n_estimators=100: berfungsi untuk model akan membangun 100 pohon keputusan bertahap.
+3. eval_metric="mae" : memberitahu xgboost bahwa metrik yang dipantau selama pelatihan adalah MAE (Mean Absolute Error).
+
+model.fit(X, y, eval_set=eval_set, verbose=False)
+
+code tersebut berfungsi untuk menjalankan pelatihan model dengan menggunakan beberapa parameter yaitu :
+    - Melatih model menggunakan data X (fitur) dan y (target).
+    - eval_set=eval_set: memberikan data evaluasi agar XGBoost bisa merekam performa di setiap iterasi.
+    - verbose=False: menonaktifkan output iterasi per pohon (agar terminal tidak penuh log panjang).
+    
+
+
+y_pred = model.predict(X)
+mae = mean_absolute_error(y, y_pred)
+rmse = np.sqrt(((y - y_pred) ** 2).mean())
+r2 = r2_score(y, y_pred)
+
+masing masing code diatas memiliki fungsi dan tujuan tersendiri. diantaranya adalah :
+
+    - y_pred = model.predict(X):
+        - Model yang sudah dilatih akan digunakan untuk memprediksi harga rumah (dalam log).
+        - Ini menghasilkan array prediksi (y_pred) berdasarkan fitur X.
+
+    - mae = mean_absolute_error(y, y_pred):
+        - Menghitung Mean Absolute Error (MAE), yaitu rata-rata selisih absolut antara prediksi dan nilai sebenarnya.
+        - Semakin kecil MAE, semakin akurat model.
+
+        - rmse = np.sqrt(((y - y_pred) ** 2).mean()):
+            - Ini adalah perhitungan RMSE (Root Mean Squared Error) secara manual.
+                - (y - y_pred) ** 2 = kuadratkan selisih.
+                - .mean() = rata-ratanya.
+                - np.sqrt(...) = akar dari hasilnya.
+            - Nilai RMSE lebih sensitif terhadap error besar karena dikuadratkan.
+
+    - r2 = r2_score(y, y_pred):
+        - Mengukur seberapa baik prediksi mendekati nilai sebenarnya.
+        - Nilai R²:
+            - 1.0 = sempurna
+            - 0 = model buruk (sama seperti tebak rata-rata)
+            - < 0 = sangat buruk
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+penjelasan mengenai XGBoost
+
+XGBoost adalah singkatan dari Extreme Gradient Boosting.
+Ia adalah algoritma machine learning berbasis pohon keputusan yang sangat kuat, cepat, dan akurat.XGBoost termasuk dalam keluarga ensemble learning, 
+yaitu teknik yang menggabungkan beberapa model (dalam hal ini pohon-pohon keputusan) untuk membuat prediksi yang lebih baik daripada satu model tunggal.
+
+    1. Konsep Inti XGBoost
+    Bayangkan kamu sedang menebak harga rumah:
+        - Model pertama: menebak harga, tapi hasilnya belum akurat.
+        - Model kedua: mencoba memperbaiki kesalahan dari model pertama.
+        - Model ketiga: mencoba memperbaiki kesalahan dari gabungan dua model sebelumnya.
+        - Dan seterusnya...
+    Proses ini disebut boosting — model berikutnya selalu berusaha memperbaiki kesalahan model sebelumnya.
+    XGBoost melakukan boosting ini secara "ekstrim" dan efisien, sehingga:
+        - Cepat diproses.
+        - Bisa digunakan untuk data besar.
+        - Bisa digunakan untuk regresi maupun klasifikasi.
+
+
+ Kesimpulan Singkat:
+    1. XGBoost adalah algoritma boosting berbasis decision tree.
+    2. Ia belajar dari kesalahan sebelumnya untuk memperbaiki prediksi.
+    3. Di proyek kamu, XGBoost digunakan karena performanya tinggi, efisien, dan sangat cocok untuk regresi harga rumah.
+
+
+
