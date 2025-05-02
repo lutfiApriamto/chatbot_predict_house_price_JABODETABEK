@@ -1,0 +1,424 @@
+import json
+import joblib
+import os
+import numpy as np
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.preprocessing import LabelEncoder
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, classification_report
+
+code diatas berfungsi untuk mengimport beberapa library atau pustaka yang akan digunakan pada saat preprocessing file intents.json sampai pelatihan model NLP
+
+# === Load file intents ===
+with open("data/intents.json", "r", encoding="utf-8") as f:
+    intents = json.load(f)
+
+code diatas berfungsi sebagai :
+    - Membuka file intents.json yang berisi daftar patterns (contoh kalimat dari user) dan tag (label untuk klasifikasi).
+    - Contoh struktur:
+
+{
+  "intents": [
+    {
+      "tag": "tanya_dari_budget",
+      "patterns": ["Saya punya dana 1M", "Budget saya 500 juta"],
+      "responses": ["Di kota mana Anda ingin mencari rumah?"]
+    }
+  ]
+}
+
+
+X = []
+y = []
+for intent in intents["intents"]:
+    for pattern in intent["patterns"]:
+        X.append(pattern.lower())
+        y.append(intent["tag"])
+
+code diatas berfungsi untuk :
+    - X: daftar kalimat user (input).
+    - y: daftar label/tag dari tiap kalimat (output yang akan diprediksi). <- silahkan baca file intents.json
+    - Teknik: bag-of-words digunakan nanti untuk mengubah teks ke numerik.
+
+
+vectorizer = CountVectorizer()
+X_vec = vectorizer.fit_transform(X).toarray()
+
+code diatas berfungsi untuk :
+    - Mengubah teks (kalimat) menjadi matriks fitur numerik berdasarkan frekuensi kata (bag-of-words).
+    - Contoh:
+        - Input: "saya punya rumah"
+        - Vektor: [1, 0, 1, 1, 0, ...] (1 jika kata muncul, 0 jika tidak)
+    - CountVectorizer sangat cepat dan ringan untuk masalah NLP skala kecil.
+        - CountVectorizer() :
+            Ini adalah class dari Scikit-learn (sklearn) yang secara otomatis:
+
+
+label_encoder = LabelEncoder()
+y_enc = label_encoder.fit_transform(y)
+
+code diatas berfungsi untuk :
+    - Mengubah label (misalnya: tanya_dari_budget, sapaan) menjadi angka (0, 1, 2, dst.) agar bisa diproses oleh algoritma machine learning.
+
+
+X_train, X_test, y_train, y_test = train_test_split(X_vec, y_enc, test_size=0.2, random_state=42)
+
+code diatas berfungsi untuk :
+    - Membagi data: 80% untuk training, 20% untuk testing.
+    - Penting agar model bisa dievaluasi secara adil, tidak hanya menghafal data training.
+
+
+model = MultinomialNB()
+model.fit(X_train, y_train)
+
+code diatas berfungsi untuk :
+    - Melatih Model dengan Multinomial Naive Bayes
+        - Algoritma: Multinomial Naive Bayes.
+        - Cocok untuk data teks dalam bentuk frekuensi kata (bag-of-words).
+        - Sederhana namun efektif untuk klasifikasi intent di chatbot kecil-menengah.
+        Kenapa MultinomialNB?
+            - Sangat cepat dilatih.
+            - Efektif untuk jumlah data kecil hingga menengah.
+            - Tidak butuh tuning rumit.
+            - Performa kompetitif untuk kasus teks dengan fitur diskrit (jumlah kata).
+
+
+y_pred = model.predict(X_test)
+acc = accuracy_score(y_test, y_pred)
+print(classification_report(y_test, y_pred, target_names=label_encoder.classes_))
+
+code diatas berfungsi untuk :
+    - Mengevaluasi akurasi dan metrik lain (precision, recall, F1-score).
+    - Hasilnya: kamu melaporkan 90% akurasi → sudah sangat baik.
+
+
+joblib.dump((model, vectorizer, label_encoder), "models/nlp_model.pkl")
+
+code diatas berfungsi untuk : 
+    - Model + vectorizer + label encoder disimpan dalam satu file .pkl agar bisa digunakan di chatbot saat runtime.
+    - Ini penting karena chatbot tidak bisa melatih model lagi secara langsung.
+
+
+Peran File Ini dalam Sistem :
+    - Memberikan otak NLP kepada chatbot.
+    - Tanpa ini, chatbot tidak akan bisa mengenali maksud user seperti "berapa harga rumah" atau "saya punya budget sekian".
+    - Hasil dari model ini digunakan untuk menentukan intent, yang lalu diproses oleh chatbot_response() untuk memberikan tanggapan yang sesuai.
+
+Cara Membaca File Ini
+Untuk memahami dan menjelaskan kepada dosen/sidang:
+    - Intent classification → proses mengubah teks ke tag.
+    - Preprocessing teks → lowercase + vectorizer.
+    - Training → supervised learning (input = kalimat, output = label intent).
+    - Evaluasi model → akurasi dan klasifikasi report.
+    - Simpan model → agar bisa dipakai oleh chatbot runtime.
+
+Kesimpulan :
+    - File ini adalah tulang punggung NLP dari chatbot kamu.
+    - Memakai pendekatan sederhana namun solid (Naive Bayes + CountVectorizer).
+    - Cukup efisien untuk digunakan dalam sistem real-time chatbot berbasis CLI atau web.
+    - Sudah terstruktur dengan baik dan mudah dipahami.
+
+
+
+
+
+penjelasan detail terkait file train_nlp_model
+
+
+penjelasan Teknik Bag-of-Wors (yang digunakan dalam file ini)
+Bag-of-Words adalah sebuah teknik dalam machine learning dan NLP untuk mengubah kalimat atau dokumen teks menjadi angka agar bisa diproses oleh algoritma.
+Intinya: BoW mengubah kalimat seperti :
+    - "saya ingin membeli rumah"
+menjadi daftar angka yang mewakili kata-kata yang ada di dalam kalimat tersebut.
+
+cara kerja :
+    1. Bangun Kosakata (Vocabulary)
+    Dari semua kalimat yang ada (dalam dataset intents.json), ambil semua kata unik dan buat daftar.
+    contohnya :
+        - Kalimat 1: saya ingin rumah
+        - Kalimat 2: saya punya uang
+        - Vocabulary = ["saya", "ingin", "rumah", "punya", "uang"]
+
+    2. Representasikan Kalimat sebagai Vektor
+    Setiap kalimat diubah menjadi vektor angka. Setiap posisi di vektor mewakili apakah kata itu muncul atau tidak muncul dalam kalimat.
+    contohnya :
+        - Kalimat: "saya ingin rumah"
+        - Vektor: [1, 1, 1, 0, 0]
+        - penjelasan :
+            - "saya" → ada → 1
+            - "ingin" → ada → 1
+            - "rumah" → ada → 1
+            - "punya" → tidak ada → 0
+            - "uang" → tidak ada → 0
+
+
+penjelasan lain mengenai Bag-of-word:
+Bag-of-Words mengubah kalimat menjadi angka berdasarkan kata-kata yang ada di dalam kalimat itu. Semakin banyak kata yang muncul, semakin besar angka di vektornya.
+
+CONTOH KASUS NYATA
+Kita punya 3 kalimat dari user chatbot:
+    1. "saya ingin membeli rumah"
+    2. "saya punya uang"
+    3. "uang saya cukup untuk rumah"
+
+Langkah 1: Buat Kosakata (Vocabulary)
+    - Gabungkan semua kata dari semua kalimat → ambil yang unik (tidak duplikat).
+        Kata-kata unik:
+            - ["saya", "ingin", "membeli", "rumah", "punya", "uang", "cukup", "untuk"]
+        Inilah kosakata (vocabulary) kita. Urutannya penting karena posisi ini akan digunakan untuk membentuk vektor.
+
+Langkah 2: Buat Representasi Vektor untuk Setiap Kalimat
+    - Gunakan kosakata tadi sebagai template, lalu hitung berapa kali setiap kata muncul di kalimat.
+        ➤ Kalimat 1: "saya ingin membeli rumah"
+            | Kata    | Muncul? | Nilai |
+            | ------- | ------- | ----- |
+            | saya    | ✅       | 1     |
+            | ingin   | ✅       | 1     |
+            | membeli | ✅       | 1     |
+            | rumah   | ✅       | 1     |
+            | punya   | ❌       | 0     |
+            | uang    | ❌       | 0     |
+            | cukup   | ❌       | 0     |
+            | untuk   | ❌       | 0     |
+        Vektor Kalimat 1: [1, 1, 1, 1, 0, 0, 0, 0]
+
+        ➤ Kalimat 2: "saya punya uang"
+            | Kata    | Muncul? | Nilai |
+            | ------- | ------- | ----- |
+            | saya    | ✅       | 1     |
+            | ingin   | ❌       | 0     |
+            | membeli | ❌       | 0     |
+            | rumah   | ❌       | 0     |
+            | punya   | ✅       | 1     |
+            | uang    | ✅       | 1     |
+            | cukup   | ❌       | 0     |
+            | untuk   | ❌       | 0     |
+        Vektor Kalimat 2: [1, 0, 0, 0, 1, 1, 0, 0]
+
+        ➤ Kalimat 3: "uang saya cukup untuk rumah"
+            | Kata    | Muncul? | Nilai |
+            | ------- | ------- | ----- |
+            | saya    | ✅       | 1     |
+            | ingin   | ❌       | 0     |
+            | membeli | ❌       | 0     |
+            | rumah   | ✅       | 1     |
+            | punya   | ❌       | 0     |
+            | uang    | ✅       | 1     |
+            | cukup   | ✅       | 1     |
+            | untuk   | ✅       | 1     |
+        Vektor Kalimat 3: [1, 0, 0, 1, 0, 1, 1, 1]
+
+    Sekarang semua kalimat sudah dalam bentuk angka. Model machine learning tidak bisa membaca kata, tapi bisa membaca angka.
+    Jadi model bisa belajar seperti ini:
+        - Kalau vektor [1, 1, 1, 1, 0, 0, 0, 0], artinya intent = “cari_rumah”
+
+
+penjelasan mengenai vector :
+Vektor adalah sekumpulan angka yang mewakili suatu objek.
+Contohnya:
+    - Teks “saya punya rumah” diubah jadi vektor [1, 0, 1, 1, 0]
+    - Setiap angka di dalam vektor menunjukkan apakah kata tertentu muncul atau tidak dalam kalimat itu.
+    - BoW = menghasilkan vektor untuk setiap kalimat → vektor ini yang diproses oleh model seperti Naive Bayes.
+
+CountVectorizer()
+Ini adalah class dari Scikit-learn (sklearn) yang secara otomatis:
+    - Mengubah daftar kalimat menjadi representasi angka
+    - Berdasarkan frekuensi kata (jumlah kata muncul di tiap kalimat)
+    - Contoh sederhananya seperti BoW manual yang tadi kita bahas
+
+Analoginya:
+    - Kalau X = ["saya punya rumah", "rumah saya besar"],
+    - maka CountVectorizer() akan membangun kosakata seperti:
+        - ["besar", "punya", "rumah", "saya"]
+
+
+penjelasan mengenai algoritma Multinomial Naive Bayes (MultinomialNB)
+
+1. Definisi Singkat:
+    Multinomial Naive Bayes adalah algoritma klasifikasi berbasis probabilitas yang cocok digunakan untuk data berupa frekuensi atau jumlah kata, seperti dalam kasus teks atau dokumen.
+Kata “multinomial” mengacu pada bahwa data input-nya adalah jumlah kemunculan fitur (dalam hal ini: kata-kata dari BoW).
+
+2. Fungsi dan Tujuan di Program Kamu
+Fungsinya adalah untuk:
+    - Memprediksi "intent" dari kalimat pengguna.
+    - Misalnya: kalimat “Saya punya 500 juta” → diprediksi sebagai intent "tanya_dari_budget".
+Model ini memetakan vektor BoW dari kalimat ke salah satu label intent (tanya_dari_budget, cari_rumah, dll.).
+
+3. Cara Kerja Multinomial Naive Bayes (Secara Sederhana)
+Inti logikanya:
+    - Hitung probabilitas sebuah kalimat masuk ke setiap label intent, lalu pilih intent dengan probabilitas tertinggi.
+Langkahnya:
+    1. Hitung frekuensi kata per intent
+        - Misalnya:
+            - Untuk label “tanya_dari_budget”, kata “budget” muncul 10 kali di semua kalimat training.
+            - Untuk label “cari_rumah”, kata “budget” muncul 0 kali.
+
+    2. Hitung probabilitas setiap kata muncul di tiap intent
+    (pakai rumus probabilitas + smoothing agar tidak 0)
+
+    3. Saat ada input baru (contoh: “saya punya budget”):
+    - BoW kalimat → [1, 1, 1, 0, 0, 0]
+    - Kalikan probabilitas kemunculan semua kata di setiap label.
+    - Ambil label dengan nilai tertinggi.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+contoh studikasus sederhana 
+
+pada studikasus mini ini tujuan kita adalah :
+Prediksi intent dari kalimat baru yaitu = "saya punya uang"
+
+Rumus Asli dari (mungkin kurang jelas untuk disini, namun lihat pada folder : kumpulan Gambar catatan/Rumus1.1)
+
+                                 n
+    P(Label∣Kalimat)∝P(Label)×   ∏  P(Kata ke [i]∣Label)
+                                i=1 
+
+Arti dari rumus :
+    - P(Label | Kalimat): Probabilitas kalimat masuk ke label tertentu (misalnya: tanya_dari_budget)
+    - P(Label): Peluang kemunculan label (misalnya: berapa banyak data tanya_dari_budget dibanding total)
+    - P(Kata_i | Label): Peluang kata ke-i muncul pada label tersebut
+    - ∏ = dikalikan semua P(kata | label) dari kata pertama sampai terakhir di kalimat
+​ Intinya: semua kata di kalimat ikut berkontribusi menentukan label, dan model memilih label dengan nilai probabilitas terbesar.
+
+namun, apabila menggunakan rumus tersebut akan sering terjadi masalah, karena :
+
+    - Kalau ada satu saja kata yang belum pernah muncul di label tertentu, maka:
+
+                P(Kata ke [i]∣Label)=0 
+            (silahkan liat pada folder kumpulan Gambar catatan/Rumus1.2)
+
+    dan karena semua dikalikan,
+
+                P(Kalimat∣Label)=0
+            (silahkan liat pada folder kumpulan Gambar catatan/Rumus1.3)
+
+    Artinya: satu kata asing bisa membuat label yang seharusnya cocok malah gugur — ini tidak adil dan tidak akurat.
+
+olehkarena itu, alih alih menggunakan rumus tersebut, kita akan menggunakan rumus laplace smoothing.
+Laplace Smoothing adalah teknik untuk mencegah probabilitas jadi nol.
+
+Rumus Laplace Smoothing :
+
+p(Kata Ke [i]|Label) = (jumlah kata + 1)/(total semua kata pada label + jumlah kata unik)
+            (silahkan liat pada folder kumpulan Gambar catatan/Rumus1.4)
+
+​sekarang mari kita kembali ke studikasus kita
+
+target kita adalah = Prediksi intent dari kalimat baru yaitu = "saya punya uang"
+
+data yang kita miliki :
+
+    | Kalimat                | Intent (Label)      |
+    | ---------------------- | ------------------- |
+    | saya punya uang        | tanya_dari_budget   |
+    | saya ingin beli rumah  | cari_rumah          |
+    | saya mau membeli rumah | cari_rumah          |
+
+Step 1: Bangun Kosakata (Vocabulary)
+    - Gabungkan semua kata unik:
+
+        ["saya", "punya", "uang", "ingin", "beli", "rumah", "mau", "membeli"]
+
+    Total 8 kata unik (Kita akan urut sesuai ini dalam BoW dan hitungan)
+
+ Step 2: Hitung Frekuensi Kata per Label :
+    -  Label: tanya_dari_budget
+        Kalimat: "saya punya uang"
+
+            | Kata    | Frekuensi |
+            | ------- | --------- |
+            | saya    | 1         |
+            | punya   | 1         |
+            | uang    | 1         |
+            | lainnya | 0         |
+            Total kata = 3
+
+    - Label: cari_rumah
+        kalimat :
+            - "saya ingin beli rumah"
+            - "saya mau membeli rumah"
+
+        Gabungan kata:
+            ["saya", "ingin", "beli", "rumah", "saya", "mau", "membeli", "rumah"]
+
+            | Kata    | Frekuensi |
+            | ------- | --------- |
+            | saya    | 2         |
+            | ingin   | 1         |
+            | beli    | 1         |
+            | rumah   | 2         |
+            | mau     | 1         |
+            | membeli | 1         |
+            | lainnya | 0         |
+            Total kata = 8
+
+ Step 3: Hitung Probabilitas Kata per Label (dengan Smoothing)
+ Gunakan rumus Laplace smoothing:
+    
+p(Kata Ke [i]|Label) = (jumlah kata + 1)/(total semua kata pada label + jumlah kata unik)
+            (silahkan liat pada folder kumpulan Gambar catatan/Rumus1.4)
+
+Ingat: jumlah kata unik = 8
+
+masukan dan hitung semua angka kedalam rumus :
+
+    - Hitung untuk Label: tanya_dari_budget (total kata = 3):
+
+        | Kata    | Frek +1 | Probabilitas                                   |
+        | ------- | ------- | ---------------------------------------------- |
+        | saya    | 1+1=2   | 2 / (3+8) = 2 / 11 ≈ 0.1818                    |
+        | punya   | 1+1=2   | 2 / 11 ≈ 0.1818                                |
+        | uang    | 1+1=2   | 2 / 11 ≈ 0.1818                                |
+        | lainnya | 0+1=1   | 1 / 11 ≈ 0.0909 (untuk kata yang tidak muncul) |
+
+    - Hitung untuk Label: cari_rumah (total kata = 8)
+
+        | Kata    | Frek +1      | Probabilitas                |
+        | ------- | ------------ | --------------------------- |
+        | saya    | 2+1=3        | 3 / (8+8) = 3 / 16 = 0.1875 |
+        | punya   | 0+1=1        | 1 / 16 = 0.0625             |
+        | uang    | 0+1=1        | 1 / 16 = 0.0625             |
+        | lainnya | sesuai tabel |                             |
+
+
+Step 4: Hitung Prior (P(Label)) :
+    Jumlah total data: 3 kalimat (3 data kalimat)
+        - tanya_dari_budget: 1 kalimat → 1/3 ≈ 0.333 <- karena intent (label) tanya_dari_budget mempunyai 1 data yaitu kalimat "saya punya uang" maka total data intent (label) tanya_dari_budget = 1 dibagi dengan jumlah kesuluruhan data = 3
+        - cari_rumah: 2 kalimat → 2/3 ≈ 0.667 <- karena intent (label) cari_rumah mempunyai 2 data yaitu kalimat "saya ingin beli rumah" dan "saya mau membeli rumah"  maka total data intent (label) tanya_dari_budget = 2 dibagi dengan jumlah kesuluruhan data = 3
+
+
+Step 5: Kalimat Baru = "saya punya uang"
+BoW: ["saya", "punya", "uang"]
+
+    - Hitung Nilai Probabilitas untuk Masing-Masing Label 
+        - singkatnya, cara mengalikan pada tahap 5 ini adalah mengalikan hasil dari step 4 pada masing masing intent (label) dengan semua data yang ada pada table (hanya probabilitas saja yang diambil) pada step 3 
+        contoh :
+            P(tanya_dari_budget | kalimat) :
+                - P(tanya_dari_budget) x P(saya∣label)×P(punya∣label)×P(uang∣label)
+                  = 0.333 × 0.1818 × 0.1818 × 0.1818 ≈ 0.333 × 0.0060 ≈ 0.002
+
+            P(cari_rumah | kalimat) :
+                - P(tanya_dari_budget) x P(saya∣label)×P(punya∣label)×P(uang∣label)
+                 = 0.667 × 0.1875 × 0.0625 × 0.0625 = 0.667 × 0.000732 ≈ 0.00049
+
+ HASIL AKHIR:
+    - P(tanya_dari_budget | kalimat) ≈ 0.002
+    - P(cari_rumah | kalimat) ≈ 0.00049
+Jadi prediksi = tanya_dari_budget
+

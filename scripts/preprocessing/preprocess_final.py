@@ -1,4 +1,4 @@
-# scripts/preprocess_final.py
+# scripts/preprocessing/preprocess_final.py
 
 import pandas as pd
 import numpy as np

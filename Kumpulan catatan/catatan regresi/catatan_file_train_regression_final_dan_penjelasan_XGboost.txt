@@ -123,6 +123,73 @@ yaitu teknik yang menggabungkan beberapa model (dalam hal ini pohon-pohon keputu
         - Bisa digunakan untuk data besar.
         - Bisa digunakan untuk regresi maupun klasifikasi.
 
+contoh studikasus ringan xgboost :
+
+Kita ingin memprediksi harga rumah berdasarkan jumlah kamar tidur (bedrooms).
+
+dan data yang kita miliki :
+
+        | ID | Bedrooms | Harga Rumah (Rp juta)  |
+        |----|----------|------------------------|
+        | 1  | 1        | 300                    |
+        | 2  | 2        | 400                    |
+        | 3  | 3        | 600                    |
+        | 4  | 4        | 800                    |
+Target kita: membangun model XGBoost yang bisa menebak harga rumah berdasarkan bedrooms.
+
+Langkah-langkah Cara XGBoost Belajar:
+    1. Tebakan awal (semua sama)
+    XGBoost mulai dengan prediksi awal yang sama untuk semua data. Misalnya:
+        - Tebakan awal: 525 (rata-rata harga)
+
+    2. Hitung error (residual) dari tebakan awal
+    contohnya :
+        - Data 1: 300 - 525 = -225
+        - Data 2: 400 - 525 = -125
+        - Data 3: 600 - 525 = +75
+        - Data 4: 800 - 525 = +275
+    Ini adalah kesalahan tebakan, dan akan dijadikan target bagi pohon pertama.
+
+    3. Pohon pertama dibangun untuk menebak error di atas
+    Pohon belajar:
+        - kalau bedrooms kecil → error negatif (harga lebih rendah dari tebakan)
+        - kalau bedrooms besar → error positif
+    Hasil dari pohon pertama misalnya:
+        - Data 1: -150
+        - Data 2: -100
+        - Data 3: +100
+        - Data 4: +200
+
+    4. Gabungkan tebakan awal + hasil pohon pertama
+        Tebakan baru = Tebakan awal + hasil pohon pertama
+                = 525 + pohon pertama
+    Misalnya:
+        - Data 1: 525 - 150 = 375
+        - Data 2: 525 - 100 = 425
+        - Data 3: 525 + 100 = 625
+        - Data 4: 525 + 200 = 725
+    Lebih dekat dengan kenyataan, kan?
+
+    5. Bangun pohon ke-2
+    Sekarang, XGBoost melihat sisa kesalahan baru:
+        - Data 1: 300 - 375 = -75
+        - Data 2: 400 - 425 = -25
+        - Data 3: 600 - 625 = -25
+        - Data 4: 800 - 725 = +75
+    Pohon ke-2 belajar dari error ini, dan terus memperbaiki prediksi sebelumnya.
+
+    Ulangi proses ini hingga 100 pohon.
+    Setiap pohon belajar memperbaiki kesalahan pohon sebelumnya.
+
+    Hasil Akhir
+    Setelah 100 pohon, prediksi akhir sangat mendekati nilai sebenarnya.
+
+    Inti Konsep:
+        - XGBoost = Tebakan awal + (Pohon 1) + (Pohon 2) + ... + (Pohon ke-N)
+    Setiap pohon bertugas memperbaiki kesalahan sebelumnya, itulah makna dari boosting.
+
+
+
 
  Kesimpulan Singkat:
     1. XGBoost adalah algoritma boosting berbasis decision tree.

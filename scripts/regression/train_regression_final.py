@@ -1,4 +1,4 @@
-# scripts/train_regression_final.py
+# scripts/regression/train_regression_final.py
 
 import pandas as pd
 import json

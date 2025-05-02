@@ -1,0 +1,211 @@
+import pandas as pd
+import joblib
+import json
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, confusion_matrix
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+code diatas berfungsi untuk melakukan import beberpaa library atau pustaka yang akan digunakan selama pelatihan model classifikasi.
+
+# Load data
+df = pd.read_csv("data/processed/preprocessed_final.csv")
+
+# Hapus baris tanpa label kategori harga
+df = df.dropna(subset=["price_category"])
+
+tujuan code diatas :
+    - Membaca dataset hasil preprocessing.
+    - Menghapus baris yang tidak memiliki label price_category agar model bisa belajar dengan baik.
+
+
+# Pisahkan fitur dan target
+X = df.drop(columns=["log_price", "price_category", "price_in_rp"]) 
+y = df["price_category"]
+
+Penjelasan:
+    - X = fitur input untuk prediksi.
+    - y = target output, yaitu price_category (murah/sedang/mahal).
+
+
+# Simpan nama kolom fitur
+feature_columns = X.columns.tolist()
+with open("models/feature_columns_zone.json", "w") as f:
+    json.dump(feature_columns, f)
+
+Tujuan: menyimpan nama-nama kolom X untuk digunakan nanti saat prediksi.
+
+
+# Bagi data
+X_train, X_test, y_train, y_test = train_test_split(X, y, stratify=y, test_size=0.2, random_state=42)
+
+Penjelasan:
+    - Data dibagi 80% training, 20% testing.
+    - stratify=y: menjaga proporsi label murah/sedang/mahal di kedua subset.
+    - random_state=42: agar hasil split selalu sama (reproducible).
+
+
+# Inisialisasi dan latih model
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
+
+Penjelasan:
+    - Inisialisasi model Random Forest.
+    - Dilatih menggunakan X_train dan y_train.
+
+# Simpan model
+    - joblib.dump(model, "models/model_zone_classifier.pkl")
+    - print("✅ Model klasifikasi zona berhasil disimpan ke models/model_zone_classifier.pkl")
+
+Tujuan: menyimpan model yang telah dilatih agar bisa dipakai di chatbot atau proses prediksi lainnya.
+
+# Evaluasi
+y_pred = model.predict(X_test)
+print("\n📊 Evaluasi Model:")
+print(f"Model yang digunakan: RandomForestClassifier")
+print(classification_report(y_test, y_pred))
+print("Confusion Matrix:")
+print(confusion_matrix(y_test, y_pred))
+
+Fungsi:
+    - Memprediksi y_test.
+    - Mencetak metrik evaluasi seperti precision, recall, f1-score dan confusion matrix.
+
+# Visualisasi Confusion Matrix
+labels = sorted(y.unique())
+conf_matrix = confusion_matrix(y_test, y_pred, labels=labels)
+
+plt.figure(figsize=(6, 5))
+sns.heatmap(conf_matrix, annot=True, fmt="d", cmap="Blues", xticklabels=labels, yticklabels=labels)
+plt.title("Confusion Matrix - RandomForestClassifier")
+plt.xlabel("Predicted")
+plt.ylabel("Actual")
+plt.tight_layout()
+plt.show()
+
+Penjelasan:
+    - Membuat confusion matrix ke dalam bentuk visual (heatmap).
+    - Membantu melihat seberapa banyak prediksi model sesuai/keliru berdasarkan label zona (murah, sedang, mahal).
+
+
+
+
+
+
+
+
+penjelasn mendetail mengenai random Forest
+
+1. Apa Itu Random Forest?
+Random Forest adalah algoritma machine learning berbasis ensemble learning,
+yang artinya ia menggabungkan banyak model sederhana (dalam hal ini, decision tree)
+untuk menghasilkan prediksi yang lebih stabil dan akurat.
+Bayangkan kamu punya banyak pohon keputusan (decision tree)
+dan setiap pohon memberikan suaranya untuk memutuskan kategori terbaik.
+Random Forest menggabungkan suara mayoritas dari pohon-pohon tersebut untuk membuat keputusan akhir.
+
+2. Bagaimana Cara Kerja Random Forest?
+    - Bootstrap Sampling: Data latih diambil secara acak dengan pengembalian untuk membuat dataset berbeda bagi tiap pohon.
+    - Training Multiple Trees: Setiap pohon dilatih hanya pada subset data tersebut, dan ketika membagi (split) fitur di setiap node, ia hanya mempertimbangkan subset acak dari fitur (bukan semua fitur).
+    - Voting:
+        - Untuk klasifikasi (seperti zona harga: murah, sedang, mahal): setiap pohon memberikan prediksi, dan hasil akhir adalah mayoritas suara.
+        - Untuk regresi: hasil akhir adalah rata-rata dari semua prediksi pohon.
+
+3. Mengapa Random Forest Cocok untuk Kasus ini ?
+    Dalam konteks program kita (klasifikasi zona harga rumah):
+        - Data kita memiliki banyak fitur (city, district, luas tanah, kamar mandi, dll).
+        - Hubungan antar fitur bisa kompleks (misalnya rumah besar di daerah murah vs rumah kecil di daerah mahal).
+        - Random Forest tahan terhadap outlier dan tidak mudah overfitting karena rata-rata dari banyak pohon mengurangi over-reliance pada data aneh.
+        - Hasil evaluasi menunjukkan akurasi tinggi dan F1-score bagus di banyak kasus real-world.
+
+## Cara Kerja Random Forest
+
+Random Forest adalah algoritma ensemble learning yang menggunakan banyak pohon keputusan (decision trees) untuk membuat prediksi.
+Ia termasuk dalam kategori supervised learning dan bisa digunakan untuk klasifikasi maupun regresi.
+Bayangkan Random Forest seperti “kerumunan ahli” (misalnya banyak arsitek) yang masing-masing memberikan pendapatnya,
+lalu keputusan akhir diambil berdasarkan suara terbanyak (klasifikasi) atau rata-rata (regresi).
+
+cara kerja :
+    1. Bagging (Bootstrap Aggregation):
+        - Algoritma akan membuat beberapa subset data secara acak (dengan pengambilan ulang/data bisa berulang).
+        - Setiap subset ini digunakan untuk melatih satu pohon keputusan.
+
+    2. Training Beberapa Pohon:
+        - Masing-masing pohon hanya melihat sebagian data dan sebagian fitur (misal dari 50 fitur, hanya 10 yang dipakai per pohon).
+        - Ini membuat pohon-pohon menjadi bervariasi dan tidak saling meniru.
+
+    3. Voting:
+    - Setelah semua pohon memberi prediksi untuk data uji, hasil akhirnya diambil berdasarkan mayoritas suara (klasifikasi) atau rata-rata (regresi).
+
+Random Forest Bekerja dalam Program :
+
+Dalam program kita (train_zone_classifier.py), RandomForest digunakan untuk mempelajari hubungan antara fitur rumah (seperti luas tanah, jumlah kamar, lokasi) dengan kelas zona harga: murah, sedang, mahal.
+    - Setiap pohon belajar secara berbeda karena datanya diacak.
+    - Ketika ada data rumah baru, semua pohon memberi prediksi zona harga.
+    - Random Forest menghitung suara dari semua pohon dan memilih zona yang paling banyak diprediksi.
+
+Contoh Sederhana :
+
+Misal, kita ingin memprediksi zona harga rumah berdasarkan fitur:
+
+        | Luas Bangunan (m2) | Kamar Mandi | Kota            | Zona Harga  |
+        |--------------------|-------------|------------------|------------|
+        | 100                | 2           | Jakarta Selatan  | mahal      |
+        | 80                 | 1           | Bekasi           | sedang     |
+        | 60                 | 1           | Depok            | murah      |
+        | 120                | 3           | Jakarta Pusat    | mahal      |
+        | 70                 | 1           | Tangerang        | sedang     |
+
+Langkah Kerja Random Forest
+
+    1. Ambil Sampel Acak:
+        - Pohon 1: Data ke-1, ke-3, ke-5
+        - Pohon 2: Data ke-2, ke-3, ke-4
+
+    2. Latih Pohon Keputusan di tiap subset.
+
+    3. Prediksi Data Baru: Misal ada rumah baru:
+        - Luas Bangunan = 90, Kamar Mandi = 2, Kota = Tangerang
+    Maka:
+        - Pohon 1 memprediksi sedang
+        - Pohon 2 memprediksi mahal
+        - Pohon 3 memprediksi sedang
+
+    4. Voting:
+    - Hasil akhir = sedang (karena 2 dari 3 pohon bilang “sedang”)
+
+catatan lengkap tentang confusion matrix:
+
+Confusion Matrix adalah tabel yang digunakan untuk mengevaluasi hasil dari klasifikasi, terutama pada kasus multiklas seperti milik kita (3 kelas: murah, sedang, mahal).
+
+Confusion Matrix:
+[[199   0  17]
+ [  2 184  23]
+ [ 18  20 171]]
+
+Misalnya, label price_category memiliki 3 kelas:
+    - Kelas 0: murah
+    - Kelas 1: sedang
+    - Kelas 2: mahal
+
+        - (Kadang kelas ini diurutkan otomatis oleh sklearn berdasarkan abjad, jadi pastikan urutan label = np.unique(y))
+
+
+Cara Membacanya:
+Baris = label aktual Kolom = label prediksi
+
+Misalnya:
+    - Baris 0: Semua rumah sebenarnya kategori murah
+        - 199 rumah diklasifikasikan benar sebagai murah
+        - 0 salah diklasifikasikan sebagai sedang
+        - 17 salah diklasifikasikan sebagai mahal
+    - Baris 1 (aktual: sedang):
+        - 2 salah diklasifikasikan sebagai murah
+        - 184 benar sebagai sedang
+        - 23 salah diklasifikasikan sebagai mahal
+    - Baris 2 (aktual: mahal):
+        - 18 salah diklasifikasikan sebagai murah
+        - 20 salah diklasifikasikan sebagai sedang
+        - 171 benar sebagai mahal
+

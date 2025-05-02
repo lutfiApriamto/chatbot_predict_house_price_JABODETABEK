@@ -1,0 +1,202 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import (
+    accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, classification_report
+)
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+
+code diatas berfungsi untuk melakukan import library/pustaka yang akan digunakan selama pelatihan model klasifikasi.
+
+
+# ==== Load data ====
+print("📦 Memuat data...")
+df = pd.read_csv("data/processed/preprocessed_final.csv")
+df = df.dropna(subset=["price_category"])
+X = df.drop(columns=["log_price", "price_category", "price_in_rp"])
+y = df["price_category"]
+
+code diatas berfungsi untuk membaca data(load data) yang akan digunakan dalam pelatihan model klasifikasi dimana :
+    - code diatas membaca data dari file preprocessed_final.csv, dan memisahkan columns "price_category". 
+    - Kita hanya fokus ke price_category, jadi kolom log_price dan price_in_rp dibuang dari fitur (X).
+    - Label (y) adalah zona harga: murah, sedang, atau mahal.
+    - nilai dari variable x pada code tersebut akan berisi semua nilai columns yang ada pada file preprocessed_final.csv selain dari columns (price_category, log_price dan price_in_rp)
+    - nilai dari variable y pada code tersebut akan berisi semua nilai yang ada pada columns "price_category"
+
+
+
+# ==== Split data ====
+X_train, X_test, y_train, y_test = train_test_split(X, y, stratify=y, test_size=0.2, random_state=42)
+
+code diatas berfungsi untuk melakukan pembagian data uji dan juga data latih dimana :
+    - Dibagi menjadi data latih (80%) dan uji (20%).
+    - stratify=y memastikan distribusi label (murah/sedang/mahal) tetap proporsional.
+        - stratify=y artinya kita memastikan bahwa proporsi label di data training dan data testing tetap sama dengan proporsi aslinya di seluruh dataset. contohnya :
+            - Misalkan kamu punya:
+                - 1000 data total
+                - 500 label "murah"
+                - 300 label "sedang"
+                - 200 label "mahal"
+
+            Tanpa stratify, pembagian train_test_split() bisa jadi acak:
+                - Train: 450 murah, 260 sedang, 90 mahal
+                - Test: 50 murah, 40 sedang, 110 mahal ❌ (berantakan!)
+
+            TAPI dengan stratify=y, pembagiannya terkontrol:
+                - Train: 80% dari tiap kelas → 400 murah, 240 sedang, 160 mahal
+                - Test: 100 murah, 60 sedang, 40 mahal ✅ (proporsional)
+
+         Kesimpulan:
+            - Tujuan: Menjaga distribusi label agar adil dan representatif di train-test.
+            - Pengaruh: Meningkatkan akurasi evaluasi model.
+            - Cara baca: “Pisahkan data dengan mempertahankan proporsi label target y.”
+
+
+
+# ==== Define models ====
+models = {
+    "LogisticRegression": LogisticRegression(max_iter=1000),
+    "RandomForest": RandomForestClassifier(n_estimators=100, random_state=42),
+    "DecisionTree": DecisionTreeClassifier(),
+    "KNN": KNeighborsClassifier(),
+    "GradientBoosting": GradientBoostingClassifier(),
+    "SVC": SVC()
+}
+
+results = []
+
+code diatas berfungsi untuk mendefinisikan beberapa algoritma yang akan digunakan selama pelatihan menjadi sebuah dictionary. 
+dimana key dari dictionary tersebut berisi nama dari algoritma sedangkan valuenya akan berisi sebuah object dari masing masing algoritma.
+
+
+# ==== Train & Evaluate ====
+print("\n📊 Evaluasi Model Klasifikasi:")
+for name, model in models.items():
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+
+    acc = accuracy_score(y_test, y_pred)
+    prec = precision_score(y_test, y_pred, average="macro", zero_division=0)
+    rec = recall_score(y_test, y_pred, average="macro", zero_division=0)
+    f1 = f1_score(y_test, y_pred, average="macro", zero_division=0)
+
+    results.append({
+        "Model": name,
+        "Accuracy": acc,
+        "Precision": prec,
+        "Recall": rec,
+        "F1-Score": f1
+    })
+
+    print(f"- {name}: Acc={acc:.3f} | Prec={prec:.3f} | Rec={rec:.3f} | F1={f1:.3f}")
+
+code diatas merupakan sebuah looping (perulangan) yang digunakan untuk melatih model secara bertahap.
+pada perulangan tersebut code :
+    - model.fit(X_train, y_train) = ini adalah method untuk menjalankan pelatihan
+    - y_pred = model.predict(X_test) = ini digunakan untuk melakukan prediksi berdasarkan nilai X_test
+
+acc = accuracy_score(y_test, y_pred)
+    prec = precision_score(y_test, y_pred, average="macro", zero_division=0)
+    rec = recall_score(y_test, y_pred, average="macro", zero_division=0)
+    f1 = f1_score(y_test, y_pred, average="macro", zero_division=0)
+
+code diatas berfungsi untuk :
+    Metrik evaluasi untuk klasifikasi zona harga:
+        - accuracy: Berapa persen prediksi model yang benar secara keseluruhan?
+        - precision: Dari semua prediksi kelas tertentu, berapa yang benar? (Menghindari false positive)
+        - recall: Dari semua data kelas tertentu, berapa yang berhasil ditangkap? (Menghindari false negative)
+        - f1: Gabungan antara precision dan recall (nilai keseimbangan)
+    
+    average="macro" : Karena label price_category kita berupa multi-class ("murah", "sedang", "mahal"), maka precision, recall, dan f1 harus dirata-rata antar kelas.
+    Tersedia beberapa pilihan:
+        - "macro" → Rata-rata tanpa melihat jumlah data per kelas (semua kelas diperlakukan sama).
+        - "weighted" → Rata-rata dengan mempertimbangkan jumlah data per kelas.
+        - "micro" → Hitung total benar dan salah di seluruh kelas, lalu ambil skor.
+
+    Kenapa pakai "macro"?
+    - Karena kamu ingin tahu performa rata-rata yang adil per kelas — walau jumlah data tidak seimbang.
+
+    zero_division=0 : Kalau ada kasus di mana model tidak pernah memprediksi suatu kelas, maka bisa terjadi pembagian 0 saat menghitung precision/recall → error.
+    contoh :
+        - precision = TP / (TP + FP) → TP = 0 dan FP = 0 → 0 / 0 ❌
+    Dengan zero_division=0, maka : Scikit-learn tidak error, tapi memberikan nilai 0.0 untuk metrik tersebut.
+
+
+    results.append({
+        "Model": name,
+        "Accuracy": acc,
+        "Precision": prec,
+        "Recall": rec,
+        "F1-Score": f1
+    })
+
+    print(f"- {name}: Acc={acc:.3f} | Prec={prec:.3f} | Rec={rec:.3f} | F1={f1:.3f}")
+
+code diatas berfungsi untuk menyimpan hasil dari pelatihan model kedalam variable results yang didefinisikan sebelumnya.
+
+# ==== Visualisasi ====
+df_results = pd.DataFrame(results)
+
+metrics = ["Accuracy", "Precision", "Recall", "F1-Score"]
+colors = ["Blues_d", "Greens_d", "Oranges_d", "Purples_d"]
+
+for metric, color in zip(metrics, colors):
+    plt.figure(figsize=(10, 6))
+    sns.barplot(x="Model", y=metric, data=df_results, palette=color)
+    plt.title(f"Perbandingan {metric} antar Model")
+    plt.ylim(0, 1)
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.show()
+
+# ==== Confusion Matrix untuk Model Terbaik ====
+best_model_name = df_results.sort_values("F1-Score", ascending=False).iloc[0]["Model"]
+print(f"\n🏆 Model terbaik berdasarkan F1-Score: {best_model_name}")
+
+best_model = models[best_model_name]
+y_pred_best = best_model.predict(X_test)
+
+conf_matrix = confusion_matrix(y_test, y_pred_best)
+sns.heatmap(conf_matrix, annot=True, fmt="d", cmap="Blues", xticklabels=np.unique(y), yticklabels=np.unique(y))
+plt.title(f"Confusion Matrix - {best_model_name}")
+plt.xlabel("Predicted")
+plt.ylabel("Actual")
+plt.tight_layout()
+plt.show()
+
+code diatas berfungsi untuk melakukan Visualisasi hasil dari Perbandingan pelatihan model antar algoritma.
+
+
+alasan mengapa menggunakan beberapa algoritma yang ada pada program :
+
+1. Bukan Asal Pilih, Tapi Berdasarkan Karakteristik Masalah:
+bebrapa algoritma tersebut dipilih karena memiliki karakteristik yang cocok untuk menangani data klasifikasi dengan fitur numerik dan kategorikal yang kompleks, seperti:
+    - Banyak fitur hasil one-hot encoding.
+    - Distribusi harga rumah yang tidak linier dan tidak selalu seimbang.
+Algoritma yang digunakan mencakup berbagai pendekatan:
+    - Linear (Logistic Regression): baseline sederhana, cocok untuk memahami apakah data cukup dipisahkan secara linear.
+    - Tree-based (Random Forest, Decision Tree, Gradient Boosting): kuat dalam menangani data tidak linier dan fitur yang kompleks.
+    - Instance-based (KNN): bergantung pada kemiripan antar data, cocok untuk data berskala kecil hingga sedang.
+    - Margin-based (SVC): baik untuk pemisahan kelas yang jelas.
+
+2. Tujuan: Eksplorasi dan Evaluasi
+Dengan mencoba beberapa algoritma:
+    - Kita dapat membandingkan performa masing-masing dari sisi akurasi, precision, recall, dan F1-Score.
+    - Kita bisa memilih model terbaik berdasarkan data nyata, bukan asumsi.
+
+3. Kenapa Harus Komparasi?
+Karena setiap algoritma memiliki kekuatan dan kelemahannya masing-masing, dan:
+    - Tidak ada jaminan satu algoritma selalu terbaik di semua kasus.
+    - Performa model tergantung pada bentuk distribusi data, jumlah fitur, dan skala dataset.
+
+ringkasan jawaban :
+Saya mencoba beberapa algoritma klasifikasi seperti Logistic Regression, Random Forest, KNN, dan Gradient Boosting karena masing-masing memiliki pendekatan berbeda dalam memecahkan masalah klasifikasi.
+Dengan membandingkan hasilnya menggunakan metrik evaluasi seperti F1-Score dan Akurasi, saya bisa memilih algoritma terbaik berdasarkan performa nyata di dataset saya. 
+Dalam hal ini, Random Forest memberikan performa terbaik karena mampu menangani data kompleks dengan banyak fitur hasil encoding."

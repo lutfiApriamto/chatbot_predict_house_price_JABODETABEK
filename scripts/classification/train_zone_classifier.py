@@ -1,4 +1,4 @@
-# scripts/train_zone_classifier.py
+# scripts/classification/train_zone_classifier.py
 
 import pandas as pd
 import joblib
@@ -6,6 +6,8 @@ import json
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, confusion_matrix
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # === Load data ===
 print("📦 Membaca data...")
@@ -37,6 +39,20 @@ print("✅ Model klasifikasi zona berhasil disimpan ke models/model_zone_classif
 # Evaluasi
 y_pred = model.predict(X_test)
 print("\n📊 Evaluasi Model:")
+print(f"Model yang digunakan: RandomForestClassifier")
 print(classification_report(y_test, y_pred))
 print("Confusion Matrix:")
 print(confusion_matrix(y_test, y_pred))
+
+# Visualisasi Confusion Matrix
+labels = sorted(y.unique())
+conf_matrix = confusion_matrix(y_test, y_pred, labels=labels)
+
+plt.figure(figsize=(6, 5))
+sns.heatmap(conf_matrix, annot=True, fmt="d", cmap="Blues", xticklabels=labels, yticklabels=labels)
+plt.title("Confusion Matrix - RandomForestClassifier")
+plt.xlabel("Predicted")
+plt.ylabel("Actual")
+plt.tight_layout()
+plt.show()
+

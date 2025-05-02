@@ -1,4 +1,4 @@
-# scripts/model_comparison.py
+# scripts/regression/model_comparison.py
 
 import pandas as pd
 import numpy as np
