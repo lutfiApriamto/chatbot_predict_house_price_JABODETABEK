@@ -30,7 +30,6 @@ models = {
     "DecisionTree": DecisionTreeRegressor(),
     "RandomForest": RandomForestRegressor(),
     "GradientBoosting": GradientBoostingRegressor(),
-    "SVR": SVR(),
     "XGBoost": XGBRegressor(objective='reg:squarederror'),
 }
 

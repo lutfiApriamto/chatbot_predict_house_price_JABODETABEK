@@ -1,0 +1,102 @@
+import joblib
+import numpy as np
+import pandas as pd
+import random
+import json
+
+code tersebut berfungsi untuk mengimport beberpaa library yang akan digunakan oleh program pada file chatbot_helpers.py
+
+# Load model & metadata
+zone_model = joblib.load("models/model_zone_classifier.pkl")
+price_model = joblib.load("models/model_best_regression.pkl")
+
+with open("models/feature_columns.json", "r") as f:
+    feature_columns = json.load(f)
+
+with open("models/feature_columns_zone.json", "r") as f:
+    zone_feature_columns = json.load(f)
+
+zone_df = pd.read_csv("data/processed/zone_label.csv")
+raw_df = pd.read_csv("data/raw/jabodetabek_house_price.csv")
+
+code tersebut berfungsi untuk membaca model, dan beberapa file yang dibutuhkan oleh program.
+
+file seperti feature_columns.json, feature_columns_zone.json, zone_label.csv dan jabodetabek_house_price.csv dibaca kembali karena :
+
+1. feature_columns.json dan feature_columns_zone.json :
+Kedua file ini menyimpan urutan dan nama-nama fitur yang digunakan saat pelatihan model.
+Saat ingin melakukan prediksi di runtime (misalnya ketika user memasukkan spesifikasi rumah),
+kita perlu memastikan bahwa input data memiliki format yang sama persis dengan yang digunakan saat pelatihan.
+Jika urutan kolom tidak cocok, model bisa memberikan hasil yang salah atau bahkan error.
+
+    - Mengapa tidak hardcode saja di kode? 
+        Karena jika di masa depan pipeline pelatihan diperbarui (misalnya ada penambahan fitur baru), kita tidak perlu mengubah kode prediksi—cukup update file JSON.
+
+2. zone_label.csv :
+Ini bukan hanya data mentah, tapi biasanya berisi hasil labeling akhir atau cluster assignment
+dari rumah-rumah di Jabodetabek yang sudah dikategorikan ke dalam zona-zona harga tertentu. File ini digunakan untuk:
+    - Sampling rumah-rumah sejenis sebagai referensi harga (lihat fungsi estimate_price_in_zone)
+    - Menampilkan contoh distrik dari zona harga tertentu (lihat get_district_examples)
+Dengan kata lain, ini berperan sebagai sumber data referensi untuk membuat respons chatbot yang lebih informatif dan realistis.
+
+3. jabodetabek_house_price.csv :
+Ini adalah data mentah yang digunakan untuk menghitung nilai batas wajar (bounds) untuk fitur numerik seperti
+luas tanah, jumlah kamar, dll. Fungsi check_unreasonable_input memanfaatkan nilai quantile (1% dan 99%) dari file ini untuk:
+    - Memberikan peringatan kepada user jika mereka memasukkan data yang sangat tidak umum.
+    - Meningkatkan kepercayaan pengguna terhadap sistem dengan validasi input otomatis.
+
+
+# Hitung batas bawah dan atas dari fitur numerik
+PERCENTILE_MIN = 0.01
+PERCENTILE_MAX = 0.99
+
+feature_bounds = raw_df[[
+    "bedrooms", "bathrooms", "land_area", "building_area",
+    "carports", "garages", "floors"
+]].quantile([PERCENTILE_MIN, PERCENTILE_MAX]).to_dict()
+
+Potongan kode tersebut memiliki fungsi utama untuk menghitung batas bawah dan batas atas (threshold)
+dari beberapa fitur numerik pada data properti, yang kemudian digunakan untuk mengecek kewajaran input dari pengguna.
+
+2. Normalisasi Input
+def normalize_input_keys(ctx)
+....
+Fungsi ini mengubah nama kunci dari format yang digunakan user/chatbot ke format yang dikenali oleh model
+(bedrooms, bathrooms, dst). Ini penting untuk menyambungkan data input dari user ke pipeline ML.
+
+3. Validasi Input Tidak Wajar
+def check_unreasonable_input(info)
+...
+Fungsi ini mengecek apakah nilai fitur berada di luar batas bawah dan atas yang ditentukan
+berdasarkan persentil 1% dan 99% dari data. Jika ada nilai mencurigakan, maka sistem akan memberikan peringatan.
+Insight:
+    - Ini membantu memastikan prediksi model tidak bias karena input ekstrem.
+
+4. Validasi Budget
+def is_unreasonable_budget(budget_rp)
+..
+Fungsi serupa seperti di atas, tapi fokus pada budget user. Dapat memberikan warning jika budget di luar jangkauan umum.
+
+5. Prediksi Zona Harga
+def predict_zone_from_features(input_row)
+..
+Fungsi ini menerima satu baris input dan mengeluarkan prediksi zona harga berdasarkan model klasifikasi zone_model.
+    - Penting: Fitur input disesuaikan dengan zone_feature_columns sebelum diprediksi.
+
+6. Estimasi Harga dalam Zona
+def estimate_price_in_zone(input_row, zone_label, sample_n=2)
+...
+Menggunakan contoh rumah dari zona yang sama (zone_label) untuk memodifikasi input user dan kemudian menggunakan price_model untuk estimasi harga.
+Hasilnya adalah list harga aktual vs prediksi.
+
+7. Contoh Distrik Berdasarkan Zona
+def get_district_examples(zone_label, kota=None, n=2)
+...
+Mengambil contoh nama kecamatan dari zona tertentu (dan kota jika disebutkan), yang digunakan untuk memperkaya jawaban chatbot.
+
+8. Penyusunan Respon Final
+def build_zone_price_response(input_row, kota=None)
+....
+Fungsi utama yang menggabungkan seluruh komponen: prediksi zona, estimasi harga, dan distrik untuk memberikan balasan deskriptif ke user.
+    Format output ramah pengguna: menjelaskan spesifikasi rumah, zona harga, dan contoh wilayah.
+

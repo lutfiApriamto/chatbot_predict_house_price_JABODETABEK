@@ -30,7 +30,7 @@ def filter_houses_by_budget(city, budget, tolerance=0.1):
 # ==== 3. Contoh penggunaan ====
 if __name__ == "__main__":
     city = "bekasi"
-    budget = 300_000_000
+    budget = 600_000_000
 
     hasil = filter_houses_by_budget(city, budget)
 

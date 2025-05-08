@@ -176,14 +176,16 @@ def build_zone_price_response(input_row, kota=None):
                 response += f"- {int(val)} {label}\n"
 
     response += f"berlokasi di kota {kota.title()}.\n\n"
-    response += f"Kota ini termasuk ke dalam zona {zone.upper()}.\n"
+    response += f"Mungkin anda bisa dapatkan dibeberapa lokasi, dengan estimasi harga : "
 
     for i, (real_price, est_price) in enumerate(prices):
         district = locations[i] if i < len(locations) and locations[i] else "Belum tersedia"
         response += (
             f"\n📍 Contoh lokasi: {district.title()}\n"
-            f"💰 Estimasi harga: Rp {est_price:,.0f}"
+            f"💰 Estimasi harga: Rp {est_price:,.0f}\n"
         )
+    
+    response += f"\n\n lokasi ini termasuk ke dalam zona {zone.upper()}.\n menurut data yang kami punya"
 
     return response.strip()
 

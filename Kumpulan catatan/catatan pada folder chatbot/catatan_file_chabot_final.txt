@@ -1,0 +1,337 @@
+import re
+import json
+import random
+import joblib
+import numpy as np
+import pandas as pd
+from chatbot_helpers import (
+    build_zone_price_response,
+    get_spec_from_budget,
+    check_unreasonable_input,
+    is_unreasonable_budget,
+    normalize_input_keys
+)
+from difflib import get_close_matches
+
+code diatas berfungsi untuk mengimport beberapa library atau pustaka external, internal, atau yang kita buat sendiri.
+
+# === Load NLP intent classification model ===
+with open("data/intents.json", "r", encoding="utf-8") as f:
+    intents_data = json.load(f)
+with open("models/nlp_model.pkl", "rb") as f:
+    nlp_model, vectorizer, label_encoder = joblib.load(f)
+with open("models/feature_columns.json", "r") as f:
+    feature_columns = json.load(f)
+
+Penjelasan:
+    -  intents_data: ini adalah data pertanyaan & respons chatbot dari intents.json. Data ini digunakan untuk mencocokkan tag intent dan memilih jawaban yang relevan.
+    - nlp_model.pkl: adalah file hasil pelatihan dari train_nlp_model.py, yang berisi:
+        - nlp_model: model klasifikasi (Multinomial Naive Bayes).
+        - vectorizer: CountVectorizer yang digunakan untuk mengubah teks menjadi vektor.
+        - label_encoder: untuk mengubah label string (seperti "cari_rumah") ke angka dan sebaliknya.
+    - feature_columns: daftar nama kolom fitur yang digunakan oleh model regresi dan klasifikasi zona, agar input ke model konsisten.
+
+
+KOTA_LIST = [
+    "jakarta pusat", "jakarta selatan", "jakarta timur", 
+    "jakarta barat", "jakarta utara", "jakarta", 
+    "bogor", "depok", "tangerang", "bekasi"
+]
+
+Penjelasan:
+    - List ini berfungsi sebagai referensi valid kota yang dikenali chatbot.
+    - Fungsi extract_info() akan mencocokkan kota dari input user dengan daftar ini, termasuk jika ejaannya mirip (menggunakan get_close_matches).
+
+# === Session context ===
+session_context = {
+    "kota": None,
+    "luas_tanah": None,
+    "jumlah_kamar": None,
+    "garasi": None,
+    "bathrooms": None,
+    "floors": None,
+    "carports": None,
+    "building_area": None,
+    "pending_budget_query": None,
+    "awaiting_luas_tanah": False,
+    "awaiting_jumlah_kamar": False,
+    "awaiting_jumlah_kamar_mandi": False,
+    "awaiting_building_area": False  # ⬅️ Tambahan penting
+}
+
+code diatas berfungsi sebagai variabel global yang digunakan chatbot untuk menyimpan konteks percakapan sementara selama satu sesi berlangsung.
+
+def extract_info(text):
+...
+Fungsi extract_info ini bertugas mengekstrak informasi penting dari teks yang diketik user.
+Ini semacam “pemindai kalimat” untuk mencari kata-kata kunci seperti jumlah kamar, luas tanah, dan kota.
+
+ Penjelasan Tiap Bagian:
+1. Semua teks dijadikan huruf kecil agar pencocokan lebih mudah dan konsisten.
+text = text.lower()
+
+2. Dicocokkan satu per satu menggunakan RegEx (Regular Expression):
+    - r'(\d+)\s*kamar mandi' ➜ tangkap jumlah kamar mandi.
+    - r'(\d+)\s*kamar\b(?! mandi)' ➜ kamar tidur, tapi pastikan bukan “kamar mandi”.
+    - r'(jakarta( [a-z]+)?|bogor|...)' ➜ mendeteksi nama kota.
+    - r'(\d+)\s*(m2|m²|meter)?\s*(luas\s*tanah)' ➜ luas tanah.
+    - dst.
+
+3. Jika tidak menemukan kota lewat regex, coba cari kemiripan kata (fuzzy matching) dengan get_close_matches(...)
+dari modul difflib. Ini berguna jika user mengetik “jakrta utara” → tetap bisa cocok ke “jakarta utara”
+
+
+build_input_row(info)
+...
+Fungsi ini bertugas membangun dataframe 1 baris (DataFrame) dari informasi yang sudah diambil dari user.
+Tujuannya adalah agar data siap dipakai oleh model machine learning untuk melakukan prediksi harga rumah atau klasifikasi zona harga.
+
+📦 Penjelasan Tiap Bagian:
+1. Inisialisasi dictionary row
+Berisi semua fitur numerik yang dibutuhkan oleh model.
+
+row = {
+    "bedrooms": ..., 
+    "bathrooms": ..., 
+    "land_area": ...,
+    ...
+}
+
+Nilai default digunakan jika info dari user tidak tersedia (misal: 0 atau 1 lantai default).
+
+2. City Feature (One-Hot Encoding Manual)
+if session_context.get("kota"):
+    city_key = session_context['kota'].lower().replace(" ", "_")
+    city_col = f"city_{city_key}"
+    row[city_col] = 1
+
+Model kita sudah dilatih dengan kolom city_jakarta_selatan, city_bogor, dll, jadi kita perlu menambahkan kolom tersebut saat input disiapkan.
+
+3. Fitur Buatan Sendiri (Feature Engineering)
+row["building_ratio"] = row["building_area"] / (row["land_area"] + 1)
+row["room_ratio"] = row["bedrooms"] / (row["bathrooms"] + 1)
+row["luas_per_kamar"] = row["building_area"] / (row["bedrooms"] + 1)
+row["kamar_mandi_per_kamar"] = row["bathrooms"] / (row["bedrooms"] + 1)
+
+Ini adalah fitur tambahan yang diturunkan dari fitur utama untuk memberi model informasi lebih kaya. Misalnya:
+    - building_ratio → seberapa besar bangunan dibanding tanah.
+    - luas_per_kamar → ukuran rata-rata kamar tidur.
+
+4. Ubah menjadi DataFrame
+df = pd.DataFrame([row])
+
+Agar bisa diproses oleh model (karena model XGBoost & RandomForest kita dilatih dengan DataFrame, bukan dictionary).
+
+5. Pastikan semua kolom tersedia
+for col in feature_columns:
+    if col not in df.columns:
+        df[col] = 0
+
+Jika kolom tertentu tidak ada (misalnya city_tangerang),
+tambahkan dengan nilai 0. Ini penting agar jumlah dan urutan kolom konsisten dengan saat pelatihan model.
+
+6. Pastikan semua data numerik
+df = df.astype({col: 'float32' for col in df.columns if df[col].dtype == 'object'})
+
+Kadang input bisa terdeteksi sebagai object, jadi pastikan semuanya numerik agar model tidak error saat memproses.
+
+get_response_by_tag(tag)
+...
+def get_response_by_tag(tag):
+    for intent in intents_data["intents"]:
+        if intent["tag"] == tag:
+            return random.choice(intent["responses"])
+    return "Maaf, saya tidak paham maksud Anda."
+
+Fungsi ini mencari dan mengembalikan respon (jawaban) berdasarkan tag intent yang telah diklasifikasikan oleh model NLP kita.
+
+Kegunaan dalam Chatbot:
+    - Fungsi ini digunakan pada:
+        - Intent seperti sapaan, ucapan_terima_kasih, unknown, not_supported, dll
+        - Situasi fallback ketika tidak ada intent yang cocok
+
+chatbot_response(user_input)
+...
+Fungsi ini adalah otak utama chatbot, yang:
+    - Memproses input dari pengguna
+    - Mengelola konteks percakapan
+    - Menentukan intent pengguna
+    - Menyusun dan mengembalikan respons
+
+if not user_input.strip():
+    return "Silakan masukkan pertanyaan..."
+
+Jika pengguna menekan enter tanpa mengetik apapun, chatbot langsung memberi balasan default agar percakapan tetap berjalan.
+
+Langkah 1: Tangani pending budget (saat user menyebut kota setelah menyebut budget sebelumnya)
+if session_context.get("pending_budget_query"):
+    info = extract_info(user_input)
+    ...
+
+Kondisi ini terjadi jika pengguna sebelumnya sudah menyebut budget tapi belum menyebut kota. Maka chatbot akan:
+    - Mengekstrak nama kota dari input
+    - Jika kota = "jakarta", minta klarifikasi wilayah
+    - Jika kota valid, langsung memanggil fungsi get_spec_from_budget() dan menampilkan rumah yang cocok.
+
+
+ Langkah 2: Tangani perintah "lanjutkan"
+if user_input.lower() == "lanjutkan":
+    ...
+Blok ini digunakan saat user menulis "lanjutkan" untuk melengkapi spesifikasi rumah.
+
+Chatbot akan mengecek:
+    - Apakah jumlah_kamar, bathrooms, luas_tanah, dan building_area sudah lengkap?
+    - Jika belum, maka chatbot bertanya satu per satu.
+
+Jika semua lengkap, akan:
+    - Validasi dengan check_unreasonable_input()
+    - Bangun input model dengan build_input_row()  
+    - Tampilkan hasil estimasi harga rumah dengan build_zone_price_response()
+
+Langkah 3: Ekstrak info dari input pengguna
+info = extract_info(user_input)
+session_context.update(...)
+
+Setelah user memberi input (misalnya: "saya ingin rumah 3 kamar tidur 2 kamar mandi"), sistem akan:
+    - Mengekstrak data numerik dan kota
+    - Update ke dalam session_context untuk disimpan
+
+Langkah 4: Tangani input yang sebelumnya ditunggu
+if session_context["awaiting_jumlah_kamar"] and "jumlah_kamar" in info:
+    ...
+
+Ini digunakan untuk mendeteksi apakah user menjawab pertanyaan sebelumnya yang sedang ditunggu (misalnya jumlah kamar).
+Jika iya, maka akan memanggil ulang fungsi chatbot_response("lanjutkan") untuk melanjutkan alur.
+
+Langkah 5: Prediksi intent dengan model NLP
+
+x_vec = vectorizer.transform([user_input]).toarray()
+intent = label_encoder.inverse_transform(nlp_model.predict(x_vec))[0]
+
+Langkah ini:
+    - Mengubah input menjadi vektor BoW (CountVectorizer)
+    - Prediksi intent dengan nlp_model
+    - Ubah hasil prediksi dari angka menjadi nama intent (LabelEncoder)
+
+
+Langkah 6: Tangani intent tanya_dari_budget
+if intent == "tanya_dari_budget":
+    ...
+
+Jika pengguna bertanya soal budget:
+    - Cari angka dan satuan (juta/miliar) di input
+    - Konversi ke angka (budget_rp)
+    - Validasi dengan is_unreasonable_budget
+    - Simpan ke dalam session_context["pending_budget_query"]
+    - Jika ada kota, langsung tampilkan estimasi spesifikasi rumah
+
+Langkah 7: Tangani intent tanya_harga dan cari_rumah
+
+if intent in ["tanya_harga", "cari_rumah"]:
+    ...
+
+Jika user menyatakan ingin cari rumah:
+    - Chatbot memastikan bahwa semua input (kota, kamar, tanah, dll) sudah lengkap
+    - Jika belum, akan bertanya satu per satu
+    - Jika sudah, proses estimasi harga
+
+
+Langkah 8: Fallback jika intent unknown
+
+if intent == "unknown":
+    ...
+
+Jika tidak bisa memahami input, akan:
+    - Cek apakah mengandung kata seperti "budget", "dana", dll
+        - Jika iya, tangani ulang dengan chatbot_response(user_input)
+    - Jika tidak, tampilkan respon dari tag unknown
+
+Terakhir: CLI (Command Line Interface)
+
+if __name__ == "__main__":
+    ...
+
+Bagian ini membuat chatbot bisa dijalankan langsung dari terminal. Saat user mengetik, akan diproses oleh chatbot_response() dan ditampilkan responnya.
+
+
+🔄 ALUR KERJA / FLOW CHATBOT (chatbot_final.py)
+
+1. Pengguna memberi input
+
+Misalnya pengguna mengetik:
+    - saya punya budget 500 juta
+
+Program berjalan dari bagian ini:
+
+while True:
+    user_input = input("🧑 Anda: ")
+    ...
+    response = chatbot_response(user_input)
+    print(f"🤖 Bot: {response}")
+
+Input itu langsung dikirim ke:
+    - chatbot_response(user_input)
+
+2. Fungsi chatbot_response() dipanggil
+
+def chatbot_response(user_input):
+
+Fungsi ini akan:
+        - Mengecek apakah ada input kosong
+        - Mengecek apakah pengguna sedang menyelesaikan percakapan sebelumnya (misalnya belum menyebutkan kota setelah menyebutkan budget)
+        - Mengekstrak informasi dari input
+        - Memprediksi intent dari input (dengan model NLP)
+        - Menyusun respons berdasarkan intent
+
+3. Jika intent adalah tanya_dari_budget
+
+Jika input mengandung kata-kata seperti:
+    - “Saya punya dana 700 juta di Depok”
+
+Maka:
+    - Dicari jumlah uang dan satuannya (juta atau miliar)
+    - Dikonversi ke angka: budget_rp = 700_000_000
+    - Dicek apakah nilai tersebut wajar (is_unreasonable_budget)
+    - Jika kota disebut: langsung cari rumah
+    - Jika tidak disebut: simpan budget ke session_context["pending_budget_query"] dan minta kota
+
+📦 Kemudian data dikirim ke:
+get_spec_from_budget(budget_rp, kota)
+Fungsi ini akan:
+    - Menyaring data rumah dari dataset (raw_df)
+    - Mencari rumah dengan harga ≤ budget
+    - Jika ditemukan: ambil spesifikasi terbaik
+    - Jika tidak ada: tampilkan yang paling mendekati
+
+4. Jika intent adalah cari_rumah atau tanya_harga
+
+Contoh input:
+    - “Saya ingin rumah 3 kamar di Jakarta Barat”
+
+Maka chatbot:
+    - Mengekstrak: jumlah kamar, kota, dll
+    - Simpan ke session_context
+    - Periksa apakah semua data lengkap:
+        - jumlah_kamar, bathroom, luas_tanah, building_area
+    - Jika belum: bertanya satu per satu
+    - Jika sudah: lanjut ke estimasi harga
+
+📦 Proses dilanjutkan dengan:
+build_input_row(session_context)
+→ build_zone_price_response(input_row, kota)
+
+build_zone_price_response() akan:
+    - Prediksi zona (murah/sedang/mahal)
+    - Ambil 2 sampel data dari zona itu
+    - Tampilkan estimasi harga dan lokasi contoh
+
+ 5. Jika intent tidak diketahui
+
+Misalnya input seperti:
+    - “Saya suka rumah minimalis”
+
+Maka intent mungkin diprediksi sebagai unknown. Chatbot akan:
+    - Cek apakah mengandung angka atau kata "budget"
+    - Jika iya: ulangi proses tanya_dari_budget
+    - Jika tidak: tampilkan jawaban dari get_response_by_tag("unknown")
+
