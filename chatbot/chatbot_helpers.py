@@ -185,7 +185,7 @@ def build_zone_price_response(input_row, kota=None):
             f"💰 Estimasi harga: Rp {est_price:,.0f}\n"
         )
     
-    response += f"\n\n lokasi ini termasuk ke dalam zona {zone.upper()}.\n menurut data yang kami punya"
+    response += f"\n\n menurut data yang kami miliki, lokasi ini termasuk ke dalam zona {zone.upper()}.\n"
 
     return response.strip()
 
