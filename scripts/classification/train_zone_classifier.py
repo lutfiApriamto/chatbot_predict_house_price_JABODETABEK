@@ -32,11 +32,11 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, stratify=y, test_size=
 model = RandomForestClassifier(n_estimators=100, random_state=42)
 model.fit(X_train, y_train)
 
-# Simpan model
+# Simpan model78103
 joblib.dump(model, "models/model_zone_classifier.pkl")
 print("✅ Model klasifikasi zona berhasil disimpan ke models/model_zone_classifier.pkl")
 
-# Evaluasi
+# # Evaluasi
 y_pred = model.predict(X_test)
 print("\n📊 Evaluasi Model:")
 print(f"Model yang digunakan: RandomForestClassifier")

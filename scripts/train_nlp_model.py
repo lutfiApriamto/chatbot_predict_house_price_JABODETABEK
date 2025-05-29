@@ -3,7 +3,6 @@
 import json
 import joblib
 import os
-import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.preprocessing import LabelEncoder
 from sklearn.naive_bayes import MultinomialNB
@@ -94,22 +93,22 @@ joblib.dump((model, vectorizer, label_encoder), "models/nlp_model.pkl")
 
 print("\n✅ Model NLP berhasil disimpan ke models/nlp_model.pkl")
 
-# === Persiapkan dataset ===
-# Hitung jumlah data per intent
-label_counts = pd.Series(y).value_counts().sort_index()
-label_names = label_encoder.classes_
+# # === Persiapkan dataset ===
+# # Hitung jumlah data per intent
+# label_counts = pd.Series(y).value_counts().sort_index()
+# label_names = label_encoder.classes_
 
-print("\n📦 Jumlah data per intent:")
-for i, count in enumerate(label_counts.values):
-    print(f"- {label_names[i]} (label {i}) berjumlah : {count} data")
+# print("\n📦 Jumlah data per intent:")
+# for i, count in enumerate(label_counts.values):
+#     print(f"- {label_names[i]} (label {i}) berjumlah : {count} data")
 
 
-# Visualisasi jumlah data per intent
-plt.figure(figsize=(10, 6))
-sns.barplot(x=label_names, y=label_counts.values, palette="viridis")
-plt.title("📊 Jumlah Data per Intent")
-plt.xlabel("Intent")
-plt.ylabel("Jumlah Data")
-plt.xticks(rotation=45)
-plt.tight_layout()
-plt.show()
+# # Visualisasi jumlah data per intent
+# plt.figure(figsize=(10, 6))
+# sns.barplot(x=label_names, y=label_counts.values, palette="viridis")
+# plt.title("📊 Jumlah Data per Intent")
+# plt.xlabel("Intent")
+# plt.ylabel("Jumlah Data")
+# plt.xticks(rotation=45)
+# plt.tight_layout()
+# plt.show()
